@@ -12,24 +12,25 @@
 /* ---- 1. GEUREN (12) ---------------------------------------------------
    nr     het nummer op het potje. Wordt opgeslagen als smellId ("1" t/m
           "12"); verander een nummer niet meer zodra er data is.
+          LET OP: controleer dat elk nummer hieronder hetzelfde is als het
+          nummer op het potje met die geur.
    label  de naam die het kind pas NA het raten te zien krijgt. Mag je
-          altijd aanpassen. (Hieronder staan voorbeelden: vervang ze door
-          jullie eigen geuren.)
+          altijd aanpassen.
    Elke geur krijgt automatisch een vaste kleur op basis van zijn nummer.
    Wil je er één zelf kiezen, voeg dan  color: "#RRGGBB"  toe.          */
 const SMELLS = [
-  { nr: 1,  label: "Kaneel" },
-  { nr: 2,  label: "Vers gemaaid gras" },
-  { nr: 3,  label: "Zee" },
-  { nr: 4,  label: "Lavendel" },
-  { nr: 5,  label: "Aardbei" },
-  { nr: 6,  label: "Pepermunt" },
-  { nr: 7,  label: "Koffie" },
-  { nr: 8,  label: "Citroen" },
-  { nr: 9,  label: "Vanille" },
-  { nr: 10, label: "Chocolade" },
-  { nr: 11, label: "Sinaasappel" },
-  { nr: 12, label: "Roos" },
+  { nr: 1,  label: "Zwitsal" },
+  { nr: 2,  label: "Pepernoten" },
+  { nr: 3,  label: "Kattenbak" },
+  { nr: 4,  label: "Tijgerbalsem" },
+  { nr: 5,  label: "Koffie" },
+  { nr: 6,  label: "Mandarijn" },
+  { nr: 7,  label: "Zweet" },
+  { nr: 8,  label: "Pindakaas" },
+  { nr: 9,  label: "Wierook" },
+  { nr: 10, label: "Zonnebrand" },
+  { nr: 11, label: "Asbak" },
+  { nr: 12, label: "Vis" },
 ];
 
 /* ---- 2. FIREBASE ------------------------------------------------------
@@ -447,8 +448,8 @@ body {
   <aside class="aside">
     <article class="card">
       <h1 class="card__title display-face">Waarom roept een geur zo direct een herinnering op?</h1>
-      <p>Bij zien, horen en voelen gaat de prikkel eerst langs de <strong>thalamus</strong>, een soort schakelstation in de hersenen, voordat hij de hersenschors bereikt. Bij geur gebeurt dat niet: reukprikkels gaan rechtstreeks van de neus naar de <strong>reukcortex</strong>.</p>
-      <p>Dat gebied ligt vlak naast — en is sterk verbonden met — de <strong>hippocampus</strong> (belangrijk voor herinneringen) en de <strong>amygdala</strong> (belangrijk voor emoties). Daardoor kan een geur ineens een herinnering én het bijbehorende gevoel oproepen, vaak sneller en sterker dan een geluid of beeld zou doen.</p>
+      <p>Alles wat je ziet, hoort of voelt, maakt in je hersenen eerst een <strong>tussenstop</strong>. Maar geur niet! Wat je ruikt, gaat vanuit je neus <strong>meteen</strong> door naar je hersenen.</p>
+      <p>Het komt daar terecht vlak naast de plekken voor je <strong>herinneringen</strong> en je <strong>gevoelens</strong>, en die plekken zijn stevig met elkaar verbonden. Daardoor kan een geur ineens een herinnering én het bijbehorende gevoel oproepen, vaak sneller en sterker dan een geluid of beeld zou doen.</p>
     </article>
     <p class="tally" id="tally" hidden><span class="tally__num display-face" id="tallyNum">0</span><span class="tally__label" id="tallyLabel">antwoorden tot nu toe</span></p>
   </aside>
@@ -717,7 +718,7 @@ async function createFirebaseStore() {
 }
 
 function createDemoStore() {
-  const KEY = "geur-geheugen-demo-v2";
+  const KEY = "geur-geheugen-demo-v3";
   if (params.get("demo") === "reset") { try { localStorage.removeItem(KEY); } catch {} }
   const read = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } };
   const write = l => { try { localStorage.setItem(KEY, JSON.stringify(l)); } catch {} };
@@ -753,18 +754,18 @@ function seedDemo() {
   const pick = arr => arr[Math.floor(rand() * arr.length)];
   const generic = ["oma", "vakantie", "zomer", "thuis", "school", "keuken", "tuin", "verjaardag", "bos", "regen", "opa", "camping", "zwembad", "winter", "fiets", "boerderij", "mama", "papa", "logeren", "feest"];
   const themed = {
-    "kaneel": ["kerst", "appeltaart", "oma", "koekjes", "warm", "speculaas"],
-    "vers gemaaid gras": ["voetbal", "zomer", "tuin", "picknick", "buiten", "grasmaaier"],
-    "zee": ["strand", "vakantie", "zout", "golven", "zandkastelen", "schelpen"],
-    "lavendel": ["oma", "slapen", "kast", "Frankrijk", "rust", "zeep"],
-    "aardbei": ["snoep", "zomer", "ijsje", "taart", "kauwgom", "slagroom"],
-    "pepermunt": ["tandpasta", "kauwgom", "fris", "snoep", "winter", "koud"],
+    "zwitsal": ["baby", "zacht", "badje", "schoon", "slapen", "knuffel"],
+    "pepernoten": ["sinterklaas", "schoen", "liedjes", "zak", "pakjesavond", "lekker"],
+    "kattenbak": ["poes", "vies", "stinkt", "kat", "bah", "opruimen"],
+    "tijgerbalsem": ["verkouden", "oma", "prikt", "neus", "ziek", "warm"],
     "koffie": ["papa", "ochtend", "mama", "bitter", "werk", "cafe"],
-    "citroen": ["zuur", "limonade", "zomer", "schoonmaken", "thee", "fris"],
-    "vanille": ["ijsje", "pudding", "taart", "zoet", "bakken", "vla"],
-    "chocolade": ["pasen", "sinterklaas", "lekker", "taart", "koekjes", "warme chocomel"],
-    "sinaasappel": ["sap", "ontbijt", "school", "fruit", "sinterklaas", "vitamine"],
-    "roos": ["tuin", "oma", "bloemen", "moederdag", "parfum", "bruiloft"],
+    "mandarijn": ["sinterklaas", "school", "fruit", "winter", "pellen", "zoet"],
+    "zweet": ["gym", "sport", "vies", "voetbal", "warm", "sokken"],
+    "pindakaas": ["brood", "ontbijt", "school", "lekker", "boterham", "nootjes"],
+    "wierook": ["kerk", "kaars", "rook", "rustig", "winkel", "vakantie"],
+    "zonnebrand": ["strand", "vakantie", "zomer", "zwembad", "zee", "zon"],
+    "asbak": ["opa", "rook", "vies", "stinkt", "sigaret", "bah"],
+    "vis": ["markt", "zee", "haring", "vissen", "boot", "bah"],
   };
   const centres = new Map(SMELL_LIST.map(sm => [sm.id, { v: rand() * 1.4 - 0.6, a: rand() * 1.4 - 0.7, sp: 0.14 + rand() * 0.22 }]));
   const out = [];
