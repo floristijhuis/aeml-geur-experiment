@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<script>
+/* =====================================================================
+   CONFIGURATIE — HIER AANPASSEN
+   Houd SMELLS en firebaseConfig precies gelijk in display.html en
+   tablet.html.
+   ===================================================================== */
+
+/* ---- 1. GEUREN (12) ---------------------------------------------------
+   nr     het nummer op het potje. Wordt opgeslagen als smellId ("1" t/m
+          "12"); verander een nummer niet meer zodra er data is.
+   label  de naam die het kind pas NA het raten te zien krijgt. Mag je
+          altijd aanpassen. (Hieronder staan voorbeelden: vervang ze door
+          jullie eigen geuren.)
+   Elke geur krijgt automatisch een vaste kleur op basis van zijn nummer.
+   Wil je er één zelf kiezen, voeg dan  color: "#RRGGBB"  toe.          */
+const SMELLS = [
+  { nr: 1,  label: "Kaneel" },
+  { nr: 2,  label: "Vers gemaaid gras" },
+  { nr: 3,  label: "Zee" },
+  { nr: 4,  label: "Lavendel" },
+  { nr: 5,  label: "Aardbei" },
+  { nr: 6,  label: "Pepermunt" },
+  { nr: 7,  label: "Koffie" },
+  { nr: 8,  label: "Citroen" },
+  { nr: 9,  label: "Vanille" },
+  { nr: 10, label: "Chocolade" },
+  { nr: 11, label: "Sinaasappel" },
+  { nr: 12, label: "Roos" },
+];
+
+/* ---- 2. FIREBASE ------------------------------------------------------
+   Firebase console → Project settings → General → Your apps → Web app
+   → "SDK setup and configuration" → Config. Plak de waarden hieronder.
+   Tip: open deze pagina met ?demo achter de URL om zonder Firebase te
+   testen met voorbeelddata (?demo=reset begint die opnieuw).          */
+const firebaseConfig = {
+  apiKey:            "AIzaSyDl3N8YRdvxTfp91x9Ngmr7EW_3fVbPY7Y",
+  authDomain:        "aeml-geur-experiment.firebaseapp.com",
+  projectId:         "aeml-geur-experiment",
+  storageBucket:     "aeml-geur-experiment.firebasestorage.app",
+  messagingSenderId: "73583670854",
+  appId:             "1:73583670854:web:71d71a459e2f183b453c47",
+};
+
+/* ---- 3. SESSIE ------------------------------------------------------------
+   Na hoeveel geuren het experiment "klaar" is. Daarna kan de begeleider
+   afronden of toch nog een geur doen; ervoor kan hij na elke geur stoppen. */
+const SMELLS_PER_SESSION = 5;
+
+/* ---- 4. WOORDEN ------------------------------------------------------------
+   Hoeveel van de drie woordvelden moeten ingevuld zijn voordat een kind
+   verder kan (2 = twee verplicht, het derde mag leeg blijven).            */
+const MIN_WORDS = 2;
+/* ======================= einde configuratie ======================== */
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F7E8E4">
+<title>Geur en geheugen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..700&family=Archivo:wdth,wght@62..125,400..700&display=swap">
+<style>
+:root {
+  --navy:      #07162C;
+  --blue-dark: #1C345B;
+  --blue-mid:  #4672A2;
+  --red:       #B02A3C;
+  --blush:     #F7E8E4;
+  --white:     #FFFFFF;
+
+  /* Twelve smell colours. 1–5 are the lab's own data colours; 6–12 extend
+     them at the same muted, editorial value. Picked for the widest possible
+     separation, but twelve hues cannot all be told apart, so on this screen
+     every dot also carries its number. */
+  --smell-1:  #B02A3C;
+  --smell-2:  #4672A2;
+  --smell-3:  #C98A2B;
+  --smell-4:  #5B8C6B;
+  --smell-5:  #6B4C6E;
+  --smell-6:  #3E9AA6;
+  --smell-7:  #E0876B;
+  --smell-8:  #1E4D6B;
+  --smell-9:  #8C8B2E;
+  --smell-10: #C4799F;
+  --smell-11: #8FB2D6;
+  --smell-12: #A48BD0;
+
+  --font-base:    'DM Sans', system-ui, sans-serif;
+  --font-display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --radius: 4px;
+
+  --dur-fast:    140ms;
+  --dur-base:    260ms;
+  --dur-slow:    520ms;
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout:  cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --focus-ring: var(--red);
+  --gutter: clamp(20px, 3.4vw, 44px);
+  --ink-soft: rgba(7, 22, 44, 0.74);
+  --ink-faint: rgba(7, 22, 44, 0.5);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--blush);
+  color: var(--navy);
+  font-family: var(--font-base);
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; }
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.display-face {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-stretch: 106%;
+  letter-spacing: -0.018em;
+}
+.num { font-family: var(--font-display); font-weight: 700; font-stretch: 106%; font-variant-numeric: tabular-nums; }
+.icon { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- App frame ---------------------------------------------------------- */
+.app {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.topbar {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-height: 76px;
+  padding: 14px var(--gutter) 0;
+}
+.topbar__mark { height: 46px; width: auto; justify-self: start; display: block; }
+.progress { justify-self: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.progress__label { font-size: 1.05rem; font-weight: 500; color: var(--ink-soft); line-height: 1; }
+.progress__label .num { font-size: 1.2em; color: var(--navy); }
+.progress__bar { display: flex; gap: 6px; }
+.progress__bar i { width: 34px; height: 3px; border-radius: 2px; background: rgba(7, 22, 44, 0.14); transition: background-color var(--dur-base) var(--ease-out); }
+.progress__bar i.is-done { background: var(--navy); }
+.progress__bar i.is-current { background: var(--red); }
+.linkbtn {
+  justify-self: end;
+  background: none;
+  border: 0;
+  padding: 12px 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-decoration-color: rgba(7, 22, 44, 0.3);
+  text-underline-offset: 4px;
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.linkbtn:active { opacity: 0.62; }
+
+.screens { flex: 1; min-height: 0; position: relative; }
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 22px var(--gutter) 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.screen.is-entering { animation: screenIn var(--dur-base) var(--ease-out) both; }
+@keyframes screenIn { from { opacity: 0; } }
+.screen__head { flex: none; margin-bottom: 22px; }
+.screen__title { font-size: clamp(2rem, 4.3vw, 3rem); line-height: 1.1; text-wrap: balance; }
+.screen__lead { margin-top: 0.5em; font-size: clamp(1.1rem, 1.9vw, 1.35rem); line-height: 1.5; color: var(--ink-soft); max-width: 44ch; }
+.screen__body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+/* The action row stays pinned to the bottom when a screen scrolls. */
+.screen__actions {
+  flex: none;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-inline: calc(-1 * var(--gutter));
+  padding: 18px var(--gutter) 26px;
+  background: var(--blush);
+}
+.screen__actions--center { justify-content: center; }
+
+@media (orientation: landscape) and (min-width: 900px) {
+  .screen--split {
+    display: grid;
+    grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    column-gap: clamp(28px, 4vw, 56px);
+  }
+  .screen--split > .screen__head { grid-column: 1; grid-row: 1; align-self: center; margin: 0; }
+  .screen--split > .screen__body { grid-column: 2; grid-row: 1; }
+  .screen--split > .screen__actions { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/* ---- Buttons -------------------------------------------------------------- */
+.btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  min-height: 64px;
+  padding: 0 2.1rem;
+  border-radius: 999px;
+  border: 2px solid var(--navy);
+  background: transparent;
+  color: var(--navy);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform var(--dur-fast) var(--ease-out),
+              opacity var(--dur-base) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out);
+}
+.btn:active:not(:disabled) { transform: scale(0.94); }
+.btn:disabled { opacity: 0.3; cursor: default; }
+.btn--primary { background: var(--navy); color: var(--blush); }
+.btn--quiet { border-color: transparent; color: var(--ink-soft); padding: 0 1.2rem; }
+.btn--xl { min-height: 84px; padding: 0 3.2rem; font-size: 1.65rem; }
+
+/* ---- Kaart ------------------------------------------------------------------ */
+.card {
+  background: var(--blue-dark);
+  color: var(--white);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+  padding: 2rem 1.9rem;
+  --focus-ring: var(--blush);
+}
+.card__title { color: var(--blush); font-size: clamp(1.5rem, 2.8vw, 2rem); line-height: 1.18; margin-bottom: 0.8em; text-wrap: balance; }
+.card p { font-size: clamp(1.05rem, 1.75vw, 1.22rem); line-height: 1.65; color: rgba(247, 232, 228, 0.84); }
+.card p + p { margin-top: 0.75em; }
+.card strong { font-weight: 600; color: var(--blush); }
+
+/* Numbered colour dot: the smell's colour carries identity, the number makes
+   it readable without relying on colour alone. */
+.nr-dot {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: var(--c);
+  color: var(--ink);
+  font: 700 1.05rem/1 var(--font-display);
+  font-stretch: 106%;
+  font-variant-numeric: tabular-nums;
+}
+.card .nr-dot, .result-card .nr-dot { box-shadow: 0 0 0 2px var(--blush); }
+
+/* ---- Intro -------------------------------------------------------------- */
+.screen--intro { padding-top: max(28px, 4vh); padding-bottom: 44px; }
+.intro {
+  margin: auto;
+  width: 100%;
+  max-width: 860px;
+  display: grid;
+  gap: clamp(22px, 3.4vh, 38px);
+  justify-items: start;
+}
+.intro__logo {
+  height: clamp(110px, 15vh, 150px);
+  padding-inline: clamp(40px, 6vh, 64px);
+  display: flex;
+  align-items: center;
+  background: var(--white);
+  border-radius: 999px;
+}
+.intro__logo svg { height: 80%; width: auto; display: block; }
+.intro__foot { position: absolute; right: var(--gutter); bottom: 10px; display: flex; align-items: center; gap: 12px; font-size: 0.8rem; color: var(--ink-faint); }
+.export-link {
+  background: none;
+  border: 0;
+  padding: 8px 2px;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ---- Pick: which jar ------------------------------------------------------ */
+.jar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(104px, 150px);
+  gap: clamp(12px, 2vw, 18px);
+  align-content: center;
+}
+@media (orientation: landscape) and (min-width: 900px) {
+  .jar-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: minmax(120px, 170px); }
+}
+.jar {
+  position: relative;
+  appearance: none;
+  border: 0;
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+  background: var(--blue-dark);
+  color: var(--blush);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out),
+              opacity var(--dur-base) var(--ease-out);
+}
+@media (hover: hover) {
+  .jar:not(:disabled):hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(7, 22, 44, 0.2); }
+}
+.jar:not(:disabled):active { transform: translateY(-1px); box-shadow: 0 3px 12px rgba(7, 22, 44, 0.18); transition-duration: var(--dur-fast); }
+.jar__nr { font-size: clamp(2.6rem, 6.4vw, 3.8rem); line-height: 1; }
+.jar__check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-spring);
+}
+.jar__done { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 0.9rem; font-weight: 500; }
+.jar[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--blush), 0 0 0 6px var(--navy); }
+.jar[aria-pressed="true"] .jar__check { opacity: 1; transform: none; }
+.jar-grid.has-choice .jar:not([aria-pressed="true"]):not(:disabled) { opacity: 0.55; }
+/* Already smelled this session: still visible, clearly out of play. */
+.jar:disabled {
+  background: transparent;
+  color: rgba(7, 22, 44, 0.42);
+  border: 2px dashed rgba(7, 22, 44, 0.22);
+  cursor: default;
+}
+.jar:disabled .jar__check { opacity: 1; transform: none; top: 10px; right: 10px; width: 24px; height: 24px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 6px 18px;
+  border: 1.5px solid rgba(7, 22, 44, 0.22);
+  border-radius: 999px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* ---- VA plot --------------------------------------------------------------- */
+.plot-wrap { position: relative; width: 100%; flex: 1; min-height: 260px; }
+.plot-wrap > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.va-plot { color: var(--navy); font-family: var(--font-base); user-select: none; -webkit-user-select: none; }
+.va-pill { fill: var(--white); }
+.va-grid line { stroke: var(--navy); stroke-opacity: 0.1; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.va-grid .is-edge { stroke-opacity: 0.2; }
+.va-grid .is-zero { stroke-opacity: 0.34; stroke-width: 1.5px; }
+.va-face { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.va-face-wrap { transition: opacity var(--dur-fast) var(--ease-out); }
+.va-axis-label { fill: currentColor; font-weight: 600; font-size: 36px; }
+.va-hint { fill: var(--ink-faint); font-size: 40px; font-weight: 500; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: var(--white); stroke-width: 14px; stroke-linejoin: round; }
+.cloud__body { vector-effect: non-scaling-stroke; }
+.mean__ring { fill: none; stroke: var(--white); stroke-width: 8px; vector-effect: non-scaling-stroke; }
+.mean__fill { stroke: var(--navy); stroke-opacity: 0.45; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.dot-nr { font-family: var(--font-display); font-weight: 700; font-stretch: 106%; font-size: 25px; text-anchor: middle; pointer-events: none; }
+.va-note {
+  fill: var(--navy);
+  font-size: 30px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--white);
+  stroke-width: 9px;
+  stroke-linejoin: round;
+}
+.me__outer { fill: none; stroke: var(--navy); stroke-width: 2.5px; vector-effect: non-scaling-stroke; }
+.me__gap { fill: var(--white); }
+.me__dot { fill: var(--navy); }
+.me__pop { transform-box: fill-box; transform-origin: center; }
+.me__pop.is-new { animation: pop var(--dur-slow) var(--ease-spring) both; }
+@keyframes pop { from { transform: scale(0); } }
+.me__label {
+  fill: var(--navy);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-stretch: 106%;
+  font-size: 38px;
+  paint-order: stroke;
+  stroke: var(--white);
+  stroke-width: 9px;
+  stroke-linejoin: round;
+}
+.me__link { stroke: var(--navy); stroke-opacity: 0.5; stroke-width: 2px; stroke-dasharray: 5 6; vector-effect: non-scaling-stroke; fill: none; }
+.clickable { cursor: pointer; }
+.hit { fill: transparent; pointer-events: all; }
+.va-clouds .cloud__body { pointer-events: visiblePainted; }
+.va-clouds .cloud__halo, .va-clouds .cloud__core { pointer-events: none; }
+.plot-legend { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; margin-top: 10px; font-size: 0.95rem; color: var(--ink-soft); }
+.plot-legend span { display: inline-flex; align-items: center; gap: 8px; }
+.plot-legend i { width: 16px; height: 16px; border-radius: 999px; display: inline-block; }
+.plot-legend .lg-mean { background: conic-gradient(var(--smell-1) 0 25%, var(--smell-3) 0 50%, var(--smell-6) 0 75%, var(--smell-12) 0); }
+.plot-legend .lg-me { background: var(--navy); box-shadow: 0 0 0 2px var(--blush), 0 0 0 3.5px var(--navy); }
+
+/* Feel step */
+.feel-input { touch-action: none; outline: none; border-radius: 999px; }
+.feel-input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
+@media (orientation: portrait), (max-width: 899px) {
+  .feel-input { flex: none; aspect-ratio: 1.4; min-height: 0; }
+}
+.feel-readout { flex: none; margin-top: 16px; min-height: 1.6em; text-align: center; font-size: 1.25rem; font-weight: 500; color: var(--ink-soft); }
+.feel-readout b { color: var(--navy); font-weight: 700; }
+
+/* ---- Words ------------------------------------------------------------------ */
+.screen--words .screen__body { justify-content: flex-start; }
+.fields { display: grid; gap: 18px; max-width: 680px; width: 100%; }
+.field { display: grid; gap: 6px; }
+.field__label { font-size: 1.05rem; font-weight: 600; color: var(--ink-soft); }
+.field__input {
+  width: 100%;
+  min-height: 70px;
+  padding: 0 20px;
+  font: 500 1.5rem var(--font-base);
+  color: var(--navy);
+  background: var(--white);
+  border: 2px solid rgba(7, 22, 44, 0.18);
+  border-radius: var(--radius);
+  transition: border-color var(--dur-fast) var(--ease-out);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.field__input:focus { border-color: var(--navy); }
+.fields__hint { margin-top: 16px; font-size: 1.1rem; font-weight: 500; color: var(--ink-soft); }
+
+/* ---- Review ------------------------------------------------------------------- */
+.review { display: grid; gap: 22px; width: 100%; max-width: 720px; }
+.review__row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; align-items: start; }
+.review__label { font-size: 1.05rem; font-weight: 600; color: var(--ink-soft); padding-top: 6px; }
+.review__value { font-size: 1.3rem; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.review__feel { display: grid; gap: 8px; justify-items: start; }
+.plot-wrap--mini { flex: none; width: min(100%, 340px); aspect-ratio: 1.4; min-height: 0; }
+.plot-wrap--mini .va-axes { display: none; }
+.word-chip { display: inline-block; padding: 8px 16px; border-radius: 999px; background: var(--white); font-size: 1.2rem; font-weight: 500; }
+.alert {
+  margin-top: 24px;
+  max-width: 720px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  background: var(--white);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+}
+.alert > svg { width: 34px; height: 34px; flex: none; color: var(--red); }
+.alert__title { font-weight: 700; font-size: 1.2rem; }
+.alert p { font-size: 1.05rem; line-height: 1.5; }
+.alert__tech { margin-top: 6px; font-size: 0.85rem !important; color: var(--ink-faint); }
+
+/* ---- Reveal: what it was, and how the others felt it ----------------------------- */
+/* Reveal and end screens grow with their content and let the screen scroll,
+   rather than squeezing the plot (an aspect-ratio box has no minimum height). */
+.reveal {
+  flex: 1 0 auto;
+  display: grid;
+  gap: 16px 36px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(200px, 1fr);
+  grid-template-areas: "head" "plot" "words";
+}
+.reveal__head { grid-area: head; }
+.reveal__kicker { font-size: 1.3rem; font-weight: 500; color: var(--ink-soft); line-height: 1.2; }
+.reveal__name {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-top: 4px;
+  font-size: clamp(2.6rem, 6.4vw, 4.2rem);
+  line-height: 1.05;
+  transform-origin: left center;
+}
+.reveal__name .nr-dot { width: 1.75em; height: 1.75em; font-size: 0.4em; }
+.screen.is-entering .reveal__name { animation: nameIn var(--dur-slow) var(--ease-spring) both; animation-delay: var(--dur-fast); }
+@keyframes nameIn { from { opacity: 0; transform: scale(0.82); } }
+.reveal__plot { grid-area: plot; flex: none; aspect-ratio: 1.4; width: min(100%, calc(33vh * 1.4)); min-height: 0; justify-self: center; }
+.reveal__words { grid-area: words; display: flex; flex-direction: column; padding: 18px 20px 14px 22px; min-height: 0; }
+.reveal__words-title { font-size: 1.15rem; font-weight: 600; color: var(--blush); }
+.reveal__words-note { font-size: 0.9rem; color: rgba(247, 232, 228, 0.72); }
+@media (orientation: landscape) and (min-width: 900px) {
+  .reveal {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "head head" "plot words";
+  }
+  .reveal__plot { width: 100%; aspect-ratio: auto; align-self: stretch; min-height: 300px; }
+}
+
+/* ---- Word clouds (reveal card + overlay) ----------------------------------------- */
+.wordcloud { position: relative; margin-top: 12px; height: min(58vh, 520px); }
+.wordcloud--inline { flex: 1; height: auto; min-height: 160px; margin-top: 8px; }
+.wordcloud span { position: absolute; left: 0; top: 0; white-space: nowrap; line-height: 1; color: var(--blush); }
+.wordcloud .is-top { color: var(--white); }
+.wordcloud .is-mine { text-decoration: underline; text-decoration-color: var(--red); text-decoration-thickness: 3px; text-underline-offset: 0.14em; }
+.wordcloud__empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-size: 1.2rem; color: rgba(247, 232, 228, 0.75); }
+
+/* ---- End: all smells --------------------------------------------------------------- */
+.result {
+  flex: 1 0 auto;
+  display: grid;
+  gap: 16px 36px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  grid-template-areas: "intro" "plot" "cards";
+}
+.result__intro { grid-area: intro; }
+.result__plot { grid-area: plot; display: flex; flex-direction: column; min-height: 0; }
+.result__plot .plot-wrap { flex: none; aspect-ratio: 1.4; width: min(100%, calc(38vh * 1.4)); min-height: 0; align-self: center; }
+.result__cards {
+  grid-area: cards;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+  gap: 10px;
+  align-content: start;
+}
+@media (orientation: landscape) and (min-width: 900px) {
+  .result {
+    grid-template-columns: minmax(360px, 42%) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "intro plot" "cards plot";
+  }
+  /* The card list may scroll; the plot stays put beside it, sized to what is
+     visible between the top bar and the pinned action row. */
+  .result__plot {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: calc(100vh - 230px);
+    height: calc(100dvh - 230px);
+    min-height: 320px;
+  }
+  .result__plot .plot-wrap { flex: 1; width: 100%; aspect-ratio: auto; min-height: 0; }
+  .result__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .result-card__icon { display: none; }
+  .result-card { grid-template-columns: auto minmax(0, 1fr); }
+}
+.result__note { margin-top: 10px; font-size: 1rem; color: var(--ink-soft); display: flex; gap: 8px; align-items: center; }
+.result__note svg { width: 22px; height: 22px; flex: none; }
+.result-card {
+  appearance: none;
+  border: 0;
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+  background: var(--blue-dark);
+  color: var(--blush);
+  padding: 10px 12px 10px 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  --focus-ring: var(--blush);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+.result-card:focus-visible { outline-color: var(--red); }
+@media (hover: hover) {
+  .result-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(7, 22, 44, 0.2); }
+}
+.result-card:active { transform: translateY(-1px); box-shadow: 0 3px 12px rgba(7, 22, 44, 0.18); transition-duration: var(--dur-fast); }
+.result-card.is-mine { box-shadow: 0 0 0 3px var(--blush), 0 0 0 6px var(--navy); }
+.result-card__name { display: block; font-size: 1.08rem; line-height: 1.2; }
+.result-card__meta { display: block; margin-top: 2px; font-size: 0.88rem; line-height: 1.35; color: rgba(247, 232, 228, 0.78); }
+.result-card__meta b { color: var(--blush); font-weight: 600; }
+.result-card__icon { width: 24px; height: 24px; color: rgba(247, 232, 228, 0.7); }
+
+/* ---- Word cloud overlay ---------------------------------------------------------- */
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: var(--gutter); }
+.overlay__scrim { position: absolute; inset: 0; background: rgba(7, 22, 44, 0.72); animation: fadeIn var(--dur-base) var(--ease-out) both; }
+.overlay__panel {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 26px 26px 30px;
+  animation: panelIn var(--dur-base) var(--ease-out) both;
+}
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes panelIn { from { opacity: 0; transform: scale(0.98); } }
+.overlay__head { display: flex; align-items: center; gap: 16px; }
+.overlay__head .nr-dot { width: 46px; height: 46px; font-size: 1.3rem; }
+.overlay__title { font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.1; color: var(--blush); }
+.overlay__meta { font-size: 1rem; color: rgba(247, 232, 228, 0.75); margin-top: 2px; }
+.overlay__meta b { color: var(--blush); font-weight: 600; }
+.icon-btn {
+  margin-left: auto;
+  flex: none;
+  width: 60px;
+  height: 60px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(247, 232, 228, 0.35);
+  background: transparent;
+  color: var(--blush);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.icon-btn:active { transform: scale(0.94); }
+.icon-btn svg { width: 28px; height: 28px; }
+
+/* ---- Notices ---------------------------------------------------------------------- */
+.notice { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: var(--gutter); background: rgba(247, 232, 228, 0.94); }
+.notice .card { max-width: 38rem; }
+.notice .card p { color: rgba(247, 232, 228, 0.86); }
+.notice code { color: var(--blush); font-size: 0.95em; }
+.notice .btn { margin-top: 22px; border-color: var(--blush); color: var(--blush); }
+.demo-badge {
+  position: fixed;
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border: 1px solid rgba(7, 22, 44, 0.25);
+  border-radius: 999px;
+  padding: 2px 10px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jar:hover, .jar:active, .result-card:hover, .result-card:active, .btn:active:not(:disabled), .icon-btn:active { transform: none !important; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-timing-function: linear !important; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- AEML-logo uit reference/aeml-logo.svg: beeldmerk en woordmerk -->
+    <g id="aeml-mark">
+      <path fill="#07162c" d="M283.2,12.32l-.15.92-7.29-2.8c-.86-.33-1.49-1.13-1.43-1.88.16-1.99,2.19-1.9,2.73-3.29l-6.11,1.75c-1.35.39-4.45,2.38-2.93,2.72l7.42,2.51c1.26.43,2.14,1.33,2.05,2.5-.07,1.04-.71,1.84-1.85,2.29l-4.47,1.76.03-1.01c1.72-.94,5.58-2.07,5.36-3.25-.07-3.55-10.08-2.18-9.8-5.33.14-1.63,2.45-2.8,3.99-3.24l19.84-5.63c-4.36,3.39-14.58,5.94-15.24,7.74-.15.42.08,1.12.58,1.32l7.28,2.91Z"/>
+      <path fill="#07162c" d="M142.35,320.32c-.51-.5-.02-.52.2-.77-.01.59.39.72.61.62,8.29,12.16,13.94,27.02,13,42.17-1.07-8.46-1.24-16.68-4.73-24.43l-4.94-10.95-3.77-6.28c-.12-.21-.34-.35-.39-.36Z"/>
+      <path fill="#07162c" d="M221.47,182.89c3.02-5.38,2.78-11.26-.99-16.59,4.99,4.02,5.86,11.95.99,16.59Z"/>
+      <path fill="#07162c" d="M73.36,257.36c-2.78-4.62-2.71-10.62.14-15.37-1.33,5.17-1.4,9.83-.14,15.37Z"/>
+      <path fill="#07162c" d="M284.3,13.06c-.31,0-.55-.21-.59-.51l.59.51Z"/>
+      <path fill="#fefeff" d="M193.39,161.53c4.76,3.05,10.09,6.74,8.46,11.74-1.32,4.04-10.15,6.38-15.78,8.48v-24.92s7.33,4.7,7.33,4.7Z"/>
+      <path fill="#fefeff" d="M180.15,115.49c-1.84-1.87-4.47-1.85-6.54-.11-.52-1.17-.43-2.42-.19-3.86,3.37-1.66,7.2-.65,9.65,2.27,2.62,3.12,2.7,7.49.46,10.95-1.31-.29-2.2-.83-2.93-1.67,1.65-2.35,1.67-5.43-.45-7.58Z"/>
+      <path fill="#fefeff" d="M179.07,122.24l-4.17-4.24c-.6-.61.15-1.51.55-1.8.53-.39,1.32-.69,2.15-.39,1.22.44,2.07,1.51,2.3,2.35.41,1.45.23,2.83-.82,4.08Z"/>
+      <path fill="#07162c" d="M271.21,17.8l-.03,1.01-9.8,4.11-26.07,7.55c-5.94,1.72-16.6,6.51-16.22,10.64.3,3.34,5.18,4.86,9.04,6.49l4.39,1.86,16.69,5.28c5.25,1.66,12.79,3.94,12.49,8.02-.22,2.96-5.78,5.68-9.58,6.66-14.86,3.82-29.54,6.9-44.66,9.96-13.13,2.66-26.06,4.51-38.71,8.79l-8.66,2.93c-8.48,2.87-18.86,5.83-25.27,12.13-2.67,2.62-4.87,5.78-4.92,9.77-.08,6.3,6.14,11.62,11.25,15.89s11.25,7.62,17.41,10.86l26.41,13.9,13.19,8.84c2.12,1.42,3.75,3.42,4.94,5.65,1.75,3.26.8,7.1-2.42,9.23-3.71,2.45-7.79,4.83-12.27,5.82l-15.76,3.48-59.03,8.64-26.31,4.96c-18.59,3.5-36.27,10.08-52.41,19.9l-8.76,6.67c-6.38,4.86-11.54,10.53-15.69,17.43-3.45,5.74-6.12,12-5.84,18.98s3.02,13.99,7.95,18.64l7.44,7.03,22.56,16.78,7.74,7.63c6.27,7.35,10.26,16.34,10.08,26.09-.26,14.2-9.82,27.06-19.26,37.33-8.43,9.17-18.19,16.53-28.01,24.33l-10.82-.11-.02-262.95c-.63-.92-1.36-1.07-2.03-1.63-.43-2.02-.21-3.72.44-5.65,1.18,0,2.05.17,3.19-.19.47-.81,1.15-2.57.47-3.45-3.3-4.21-3.74-10.03-.51-14.24,2.09-2.73,4.85-3.92,8.07-3.81,3.05.11,5.72,1.51,7.5,4.78,7.12-5.5,10.52-14.06,9.07-23.01-2.47-1.73-3.16-4.51-2.62-7.8,11.53-.47,21.82-6.6,28.16-16.54,12.12-19.01,3.17-40.55,24.31-50.17l.06-10.33-2.7-.34V0s37.03,0,37.03,0v5.63s-2.71.34-2.71.34l.07,10.34c20.4,9.34,12.74,29.45,23.04,48.06,6.11,11.05,16.99,18.18,29.53,18.65l-.3,4.94c11.43-3.18,22.51-5.66,34.13-8.09l50.26-10.51c4.77-1,13.13-3.87,13.56-6.15.58-3.08-4.37-4.86-8.51-6.19l-23.94-7.7c-3.77-1.21-9.95-4.63-10.31-8.14-.17-1.61.77-2.58,1.73-3.76,4.02-4.93,11.5-7.02,18-8.89l17.5-5.03,13.55-4.67c1.09-.38,2.01-.51,2.94-1.02ZM111.13,1.35l-3.55-.26-26.83.05-3.56.25c-.2,1.1-.23,2.1.09,3.08,11.43-1.14,22.34-1.16,33.8,0,.25-.97.26-1.97.05-3.12ZM66.82,41.99c1.12-10.11,5.96-19.35,16.03-22.02l.03-13.34h22.56s0,13.26,0,13.26c10.19,2.87,14.97,11.92,16.13,22.51,2.34,21.36,12.37,40.14,34.38,44.77l-.61,3.3c3.38-.2,6.65-3.63,5.46-5.93-17.71-1.2-30.84-15.51-34.18-32.46l-3.3-16.79c-1.63-8.26-6.95-14.64-14.78-17.8V5.5s-28.73,0-28.73,0v12c-7.99,3.21-13.24,9.78-14.88,18.19l-3.21,16.41c-3.3,16.86-16.49,31.33-34.23,32.44-.65,1.74.13,3.38,1.94,4.16,3,10.43-1.34,22.1-10.87,27.52-1.27-3.18-3.3-5.11-5.9-5.44-2.78-.35-5.27.61-7.16,2.74-2.29,2.59-2.91,5.92-1.64,9.31.98,2.61,3.54,5.68,6.86,5.77l7.14.18-.27-6.12c-2.76,3.42-6.87,3.59-9.34,1.02-2.62-2.74-2.23-7.25,1.17-9.11,1.81-.99,4.18-.56,5.25,1.01.33.49.2.97.13,1.23-.42,1.5-1.87-.98-2.94-1.1-.86-.09-1.7.2-2.38.83-1.44,1.34-1.62,3.29-.66,5.08.81,1.51,2.28,2.18,4.16,2.16,1.98-.02,2.61-2.31,3.97-3.09,4.26-2.41,8.25-4.46,11.23-8.57,5.3-7.31,6.61-16.23,4.19-24.98,22.66-4.81,32.11-24.01,34.46-45.18ZM1.94,135.27c2.43,1.46,4.7-.15,5.89-2.1.69-1.12,1.18-2.17.47-3.22-.4-.6-1.8-1.59-2.57-.78-.32.54.41,2.12-.58,2.86-.55.42-2.12.04-3.01.33-.68.22-.91,2.48-.2,2.9ZM193.39,161.53l-7.32-4.7v24.92c5.63-2.1,14.46-4.44,15.78-8.48,1.64-5-3.7-8.69-8.46-11.74Z"/>
+      <path fill="#07162c" d="M284.28,13.03c.79.69,1.16,1.64.97,2.71-.52,2.9-7.9,6.55-11.99,7.92l-28.78,9.69c-1.62.55-6.71,3.95-6.33,6.27.45,2.8,5.48,4.76,9.35,5.84,4.22,1.17,8.08,2.73,12.24,4.05l14.25,4.51c2.3.73,4.31,1.95,6.29,3.29,2.51,1.69,4.2,4.28,3.84,7.34-.28,2.4-1.94,5.05-4.48,6.35-4.58,2.36-9.18,4.48-14.34,5.8l-45.78,11.71-16.26,4.95c-9.78,2.98-23,7.34-29.15,15.79,4.19-.68,7.7.17,10.2,3.29,3.06,3.81,3.12,8.92.62,13.36l6.34,3.65,27.08,11.24,20.23,8.16c8.59,3.47,16.58,7.7,23.59,13.77,2.72,2.35,4.9,5.37,6.16,8.59,3.09,7.89-.63,15.3-7.16,19.94-4.69,3.33-8.61,7.29-14.19,9.28l-18.39,6.55c-8.44,3.01-16.61,5.39-25.41,7.22l-17.13,3.57-.02,183.16-8.6.02,2.18-10.23c5.6-26.32-1.44-56.81-19.97-76.47l-6.08-6.45c-4.5-4.78-8.7-9.37-13.94-13.43l-21.32-16.54-4.68-4.5c-3.32-3.19-6.79-6.6-8.72-10.75-3.65-7.84-1.47-16.39,4.79-21.87,5.44-4.77,11.11-8.35,18.1-10.28l29.99-8.3,18.83-4.27,34.82-7.71c2.56-.57,4.65-1.4,7.12-2.1,10.31-2.95,20.46-5.89,30.05-10.78l9.11-5.76c6.66-4.21,11.74-11.34,9.01-18.95-1.99-5.56-6.1-9.51-11.12-12.44l-11.83-6.9-46.26-18.91c-8.13-3.32-19.33-9.02-24.22-15.66-2.61-3.54-2.48-8.39.24-11.83,2.53-3.21,5.65-5.6,9.3-7.48,11.68-6.01,29.81-11.25,43.09-14.58l38.7-9.69,6.65-2.51c2.94-1.11,6.07-1.94,8.61-3.8,1.97-1.45,2.99-4.05,2.54-6.12-.49-2.24-1.96-3.92-4.07-5-5.82-3.01-11.89-4.9-18.22-6.67-3.97-1.11-7.59-2.46-11.42-3.88-4.25-1.58-11.83-3.72-11.94-7.54-.11-4.03,5.57-7.39,9.91-8.81l20.19-6.61c3.3-1.08,6.31-1.95,9.36-3.67,2.59-1.47,8.16-2.82,7.79-5.7-.07-.55-.48-1.19-.97-1.62l.15-.92c.15.06.32.13.51.23.03.29.27.49.56.49ZM180.15,115.49c2.12,2.16,2.1,5.23.45,7.58.73.84,1.62,1.38,2.93,1.67,2.23-3.46,2.15-7.83-.46-10.95-2.45-2.92-6.28-3.94-9.65-2.27-.23,1.45-.32,2.69.19,3.86,2.06-1.75,4.7-1.76,6.54.11ZM179.07,122.24c1.06-1.24,1.23-2.63.82-4.08-.24-.84-1.08-1.91-2.3-2.35-.83-.3-1.62,0-2.15.39-.4.29-1.15,1.19-.55,1.8l4.17,4.24Z"/>
+      <path fill="#fff" d="M66.82,41.99c-2.35,21.17-11.8,40.37-34.46,45.18,2.42,8.75,1.12,17.67-4.19,24.98-2.98,4.11-6.97,6.15-11.23,8.57-1.36.77-2,3.07-3.97,3.09-1.88.02-3.35-.66-4.16-2.16-.96-1.79-.78-3.74.66-5.08.67-.63,1.52-.92,2.38-.83,1.06.11,2.52,2.6,2.94,1.1.07-.26.21-.74-.13-1.23-1.06-1.57-3.44-2-5.25-1.01-3.4,1.86-3.8,6.37-1.17,9.11,2.46,2.57,6.58,2.4,9.34-1.02l.27,6.12-7.14-.18c-3.32-.08-5.88-3.16-6.86-5.77-1.27-3.39-.65-6.72,1.64-9.31,1.89-2.14,4.38-3.1,7.16-2.74,2.6.33,4.63,2.25,5.9,5.44,9.53-5.42,13.87-17.09,10.87-27.52-1.81-.79-2.59-2.42-1.94-4.16,17.74-1.11,30.93-15.58,34.23-32.44l3.21-16.41c1.64-8.41,6.9-14.98,14.89-18.19V5.5s28.73,0,28.73,0v12c7.83,3.16,13.16,9.54,14.78,17.8l3.3,16.79c3.34,16.95,16.47,31.26,34.18,32.46,1.19,2.31-2.08,5.73-5.46,5.93l.61-3.3c-22.02-4.63-32.05-23.4-34.38-44.77-1.16-10.59-5.93-19.65-16.13-22.51V6.64s-22.55,0-22.55,0l-.03,13.34c-10.07,2.67-14.91,11.91-16.03,22.02Z"/>
+      <path fill="#fff" d="M111.13,1.35c.21,1.15.2,2.15-.05,3.12-11.46-1.17-22.37-1.15-33.8,0-.32-.98-.29-1.98-.09-3.08l3.56-.25,26.83-.05,3.55.26Z"/>
+      <path fill="#fff" d="M1.94,135.27c-.71-.42-.48-2.68.2-2.9.89-.29,2.46.09,3.01-.33.99-.74.26-2.32.58-2.86.78-.81,2.17.18,2.57.78.71,1.05.21,2.09-.47,3.22-1.2,1.95-3.46,3.55-5.89,2.1Z"/>
+    </g>
+    <g id="aeml-word">
+      <path fill="#07162c" d="M230.26,400.33l-.03-27.02-8.54,21.66-4.7.04-6.29-14.6-2.69-6.56.09,26.36c-1.37.23-2.55.19-3.95.08v-35.32c1.55-.27,2.98-.27,4.64.02l10.89,25.07,10.16-25.17c1.65-.14,2.91-.2,4.46.09v35.33s-4.03.03-4.03.03Z"/>
+      <path fill="#07162c" d="M294.55,400.28l-4.22.03-.14-17.67c-.01-1.48-.38-2.93-1.51-3.74-.91-.66-2.39-1.16-3.81-.78-3.62.97-5.85,4.38-5.88,8.12l-.11,14.08h-4.21s0-25.53,0-25.53l4.22-.02.18,4.32c1.91-3.77,5.6-5.63,9.79-4.86,2.78.51,4.54,2.28,5.65,4.91,3.48-5.34,9.29-6.55,13.04-3.35,1.74,1.49,2.55,3.8,2.56,6.44l.06,18.09h-4.23s-.12-17.61-.12-17.61c-.01-1.63-.6-3.04-1.73-3.9-1.05-.81-2.65-1.07-4.19-.55-3.23,1.09-5.24,4.36-5.26,7.81l-.09,14.22Z"/>
+      <path fill="#07162c" d="M254.24,334.24c-1.64.2-2.79.2-4.23,0l-.13-17.8c-.01-1.42-.55-2.7-1.41-3.43-1.05-.88-2.59-1.3-4.1-.85-3.6,1.06-5.66,4.52-5.69,8.24l-.1,13.79c-1.5.26-2.82.27-4.22,0v-25.36s4.23-.02,4.23-.02c.07,1.35-.24,2.43.24,4.07,2.26-3.97,6.25-5.71,10.7-4.41,2.31.68,3.72,2.57,4.72,4.84,2.37-4.41,6.96-6.41,11.3-4.58,2.9,1.22,4.23,4.14,4.24,7.24l.09,18.25c-1.63.26-2.94.22-4.26-.01l-.13-17.75c-.01-1.51-.74-2.93-1.59-3.59-1.28-.99-3.01-1.18-4.57-.55-3.13,1.27-5,4.53-5.02,7.96l-.08,13.95Z"/>
+      <path fill="#07162c" d="M488.78,401.04c-3.47-.2-5.88-1.82-7.29-4.73-.75,1.65-.41,2.74-.66,4.03h-4.24s.3-6.32.3-6.32l.07-30.48,4.18-.07.22,15.27c2.39-3.38,5.37-5.02,9.27-4.61,8.73.91,11.46,12.63,7.86,20.84-1.73,3.94-5.14,6.32-9.71,6.06ZM494.55,393.22c1.43-3.6,1.26-7.52.28-11.08-.79-2.87-3.42-4.56-6.09-4.71s-5.16,1.38-6.31,3.98c-1.65,3.71-1.7,8.09-.17,11.82,1.09,2.66,3.45,4.31,6.04,4.29,2.53-.03,5.12-1.47,6.25-4.3Z"/>
+      <polygon fill="#07162c" points="222.19 317.44 208.81 317.45 208.81 330.45 225.41 330.48 225.42 334.33 204.14 334.32 204.14 298.81 224.14 298.8 224.15 302.74 208.95 302.72 208.8 313.94 222.18 313.97 222.19 317.44"/>
+      <path fill="#07162c" d="M416.62,334.85c-3.65-.71-5.55-3.5-5.62-6.63-.17-7.02,8.47-8.27,15.77-9.79.44-1.84.57-4.26-.77-5.66-1.67-1.77-4.67-1.69-6.91-1.12-1.88.48-2.94,1.86-3.14,3.79h-4.61c.7-7.05,10.08-9.05,16.64-6.07,1.97.9,3.13,2.78,3.15,4.91l.14,14.66c.02,1.87.29,3.46.84,5.35l-4.53-.02c-.34-1.14-.23-2.18-.9-3.27-2.67,3.09-6.16,4.61-10.08,3.85ZM420.23,331.82c5.1-.48,7.58-5.3,6.63-10.24-5.39.93-12.24,2.84-11.12,7.48.4,1.64,2.16,2.98,4.49,2.76Z"/>
+      <path fill="#07162c" d="M451.64,400.66c-3.23-.91-4.75-3.51-4.87-6.2-.32-7.32,8.2-8.45,15.74-10.03.37-1.62.68-4.04-.54-5.41-1.98-2.24-5.66-2.14-8.14-.93-1.42.69-2.02,1.81-2.06,3.39l-4.71-.03c.86-7.11,9.92-8.92,16.35-6.24,2.17.9,3.47,2.74,3.48,5.11l.07,11.97c.02,2.81.16,5.33.91,8.07l-4.53-.07-.86-3.31c-2.64,3.1-6.63,4.87-10.83,3.68ZM455.38,397.84c4.75.23,8.35-4.74,7.24-10.38l-8.98,2.99c-1.75.58-2.49,2.72-2.17,4.44.3,1.57,1.72,2.84,3.91,2.95Z"/>
+      <path fill="#07162c" d="M371.29,328.53c-1.96,4.44-6.4,6.47-10.61,6.51-4.3.04-8.65-1.99-10.65-6.23-2.1-4.45-2.08-10.11.03-14.54,1.94-4.08,6.1-6.1,10.19-6.19s8.68,1.78,10.77,5.94c2.16,4.31,2.31,9.89.27,14.51ZM366.93,327.47c1.78-3.65,1.69-7.87.2-11.41-1.2-2.87-3.65-4.42-6.47-4.46-2.62-.04-5.1,1.4-6.38,4.05-1.8,3.72-1.83,8.43.13,12.05,1.37,2.53,3.72,3.86,6.28,3.8s4.94-1.35,6.25-4.04Z"/>
+      <path fill="#07162c" d="M301.24,328.53c-1.96,4.44-6.4,6.47-10.61,6.51s-8.65-1.99-10.65-6.23c-2.1-4.45-2.08-10.11.03-14.54,1.94-4.08,6.1-6.1,10.19-6.19,4.29-.09,8.68,1.78,10.77,5.94,2.16,4.31,2.31,9.89.27,14.51ZM296.88,327.47c1.78-3.65,1.69-7.87.2-11.41-1.2-2.87-3.65-4.42-6.47-4.46-2.62-.04-5.1,1.4-6.38,4.05-1.8,3.72-1.83,8.43.13,12.05,1.37,2.53,3.72,3.86,6.28,3.8s4.94-1.35,6.25-4.04Z"/>
+      <path fill="#07162c" d="M340.47,395.98c-2.42,3.83-6.48,5.2-10.46,5.04s-7.9-2.05-9.82-5.92c-2.28-4.59-2.3-10.6.04-15.16,2.04-3.97,6.22-5.84,10.23-5.86s8.31,1.72,10.42,5.66c2.57,4.83,2.61,11.46-.41,16.24ZM337.16,382.05c-1.15-2.75-3.56-4.32-6.34-4.44-2.63-.11-5.2,1.33-6.53,4.01-1.83,3.71-1.81,8.42.13,12.08,1.43,2.7,4.1,4.03,6.9,3.8,6.11-.52,8.57-8.93,5.84-15.44Z"/>
+      <path fill="#07162c" d="M383.66,403.27c-2.72,6.42-6.51,7.44-13.01,6.98l.04-3.56c2.26.04,4.88.33,6.78-1.21,1.93-1.57,2.78-4.06,3.56-6.5l-10.84-24.07,4.74-.05,8.45,18.69,7.99-18.71,4.28.06-12.01,28.37Z"/>
+      <path fill="#07162c" d="M261.19,393.88l4.31-.06c-.43,4.48-4.42,6.77-8.65,7.19-5.89.58-11.07-2.19-12.82-7.97-2.46-8.11.96-17.09,8.23-18.62,3.85-.81,7.69-.23,10.31,2.51,2.81,2.93,3.18,7.06,2.91,11.15l-17.91.03c-.28,2.65.72,5.37,2.57,7.26s4.92,2.52,7.77,1.91c1.63-.35,2.94-1.3,3.28-3.41ZM261.54,384.79c-.05-3.48-1.49-5.48-3.5-6.47-2.27-1.12-4.91-.97-6.95.58s-3.07,3.68-3.36,6.05l13.8-.16Z"/>
+      <path fill="#07162c" d="M385.81,319.56l-.14,14.67c-1.3.19-2.62.23-4.25,0l.02-25.38,4.27-.03c0,1.42-.32,2.45.28,4.02,2.01-3.75,5.96-5.34,10.03-4.6,3.89.71,6.26,3.69,6.28,7.67l.1,18.4h-4.29s-.05-16.89-.05-16.89c0-3.2-2.13-5.75-5.54-5.39-3.69.39-6.68,3.55-6.72,7.54Z"/>
+      <path fill="#07162c" d="M439.94,396.44c.47,1.45.34,2.66.09,3.91h-23.09s-.02-35.41-.02-35.41c1.66-.22,2.92-.22,4.61,0v31.5s18.4,0,18.4,0Z"/>
+      <path fill="#07162c" d="M327.04,330.74l.06,3.51c-2.35.7-4.96,1.08-7.46.47-3.38-.82-5.46-3.43-5.49-6.89l-.14-15.37-4.38-.12.02-3.54,4.3-.05.08-6.02h4.23s.13,5.92.13,5.92l7.33.14c.12,1.33.13,2.37-.08,3.57h-7.27s.06,14.66.06,14.66c.01,2.65,1.96,4.94,4.58,4.46l4.02-.74Z"/>
+      <rect fill="#07162c" x="441.16" y="297.42" width="4.22" height="36.93"/>
+      <path fill="#07162c" d="M355.66,400.21l-4.23.1v-25.52s4.22-.02,4.22-.02l.2,3.86c2.32-3.27,5.65-5.29,9.81-4.31l.1,4.55c-2.58-1.18-4.69-.9-6.81.54-1.78,1.21-3.11,3.32-3.14,5.96l-.16,14.83Z"/>
+      <rect fill="#07162c" x="335.32" y="308.79" width="4.32" height="25.67" transform="translate(-.75 .79) rotate(-.13)"/>
+      <rect fill="#07162c" x="335.3" y="298.76" width="4.36" height="4.43" transform="translate(-9.2 10.64) rotate(-1.78)"/>
+      <path fill="#fff" d="M494.55,393.22c-1.13,2.83-3.71,4.27-6.25,4.3-2.6.03-4.95-1.62-6.04-4.29-1.53-3.73-1.48-8.11.17-11.82,1.15-2.6,3.72-4.13,6.31-3.98s5.29,1.84,6.09,4.71c.98,3.56,1.15,7.48-.28,11.08Z"/>
+      <path fill="#fff" d="M420.23,331.82c-2.33.22-4.09-1.12-4.49-2.76-1.12-4.63,5.73-6.55,11.12-7.48.95,4.93-1.54,9.75-6.63,10.24Z"/>
+      <path fill="#fff" d="M455.38,397.84c-2.2-.11-3.62-1.37-3.91-2.95-.32-1.72.42-3.86,2.17-4.44l8.98-2.99c1.12,5.64-2.48,10.61-7.24,10.38Z"/>
+      <path fill="#fff" d="M366.93,327.47c-1.31,2.69-3.78,3.98-6.25,4.04s-4.91-1.27-6.28-3.8c-1.96-3.62-1.93-8.33-.13-12.05,1.29-2.66,3.76-4.09,6.38-4.05,2.82.04,5.27,1.59,6.47,4.46,1.48,3.53,1.57,7.75-.2,11.41Z"/>
+      <path fill="#fff" d="M296.88,327.47c-1.31,2.69-3.78,3.98-6.25,4.04s-4.91-1.27-6.28-3.8c-1.96-3.62-1.93-8.33-.13-12.05,1.29-2.66,3.76-4.09,6.38-4.05,2.82.04,5.27,1.59,6.47,4.46,1.48,3.53,1.57,7.75-.2,11.41Z"/>
+      <path fill="#fff" d="M337.16,382.05c2.73,6.51.28,14.92-5.84,15.44-2.8.24-5.47-1.09-6.9-3.8-1.94-3.66-1.96-8.36-.13-12.08,1.33-2.68,3.9-4.13,6.53-4.01,2.78.12,5.18,1.69,6.34,4.44Z"/>
+      <path fill="#fff" d="M261.54,384.79l-13.8.16c.29-2.38,1.38-4.56,3.36-6.05s4.68-1.7,6.95-.58c2.01.99,3.45,3,3.5,6.47Z"/>
+      <path fill="#07162c" d="M470.15,268.27c-1.44.12-2.9.2-4.26-.08l-.1-17.57c0-1.48-.38-2.92-1.51-3.73-.91-.66-2.39-1.16-3.81-.78-3.62.97-5.85,4.38-5.88,8.12l-.11,14.08h-4.21s0-25.53,0-25.53l4.22-.02.18,4.32c1.91-3.77,5.6-5.63,9.79-4.86,2.78.51,4.54,2.28,5.65,4.91,3.46-5.36,9.31-6.55,13.03-3.36,1.59,1.36,2.51,3.48,2.53,5.96l.13,18.46-4.27.11-.12-17.61c-.01-1.63-.6-3.04-1.73-3.9-1.05-.81-2.65-1.07-4.19-.55-3.23,1.09-5.24,4.36-5.26,7.81l-.09,14.22Z"/>
+      <path fill="#07162c" d="M261.45,268.28l-4.22.03-.14-17.67c-.01-1.48-.38-2.93-1.51-3.74-.91-.66-2.39-1.16-3.81-.78-3.62.97-5.85,4.38-5.88,8.12l-.11,14.08h-4.21s0-25.53,0-25.53l4.22-.02.18,4.32c1.91-3.77,5.6-5.63,9.79-4.86,2.78.51,4.54,2.28,5.65,4.91,3.48-5.34,9.29-6.55,13.04-3.35,1.74,1.49,2.55,3.8,2.56,6.44l.06,18.09h-4.23s-.12-17.61-.12-17.61c-.01-1.63-.6-3.04-1.73-3.9-1.05-.81-2.65-1.07-4.19-.55-3.23,1.09-5.24,4.36-5.26,7.81l-.09,14.22Z"/>
+      <path fill="#07162c" d="M400.03,269.01c-4.52.39-8.2-1.74-10.02-5.67-2.22-4.81-2.21-10.45-.12-15.3,1.84-4.25,5.83-6.4,10.38-5.9,3,.33,5.09,1.88,6.75,4.63l.2-15.3,4.22.1.02,36.75-4.32.02c.05-1.17.31-2.1-.36-3.51-1.53,2.46-3.52,3.91-6.75,4.19ZM405.85,261.75c1.81-3.84,1.72-8.26.19-11.99-1.1-2.67-3.4-4.17-6.03-4.16-2.47.01-4.97,1.45-6.13,4.05-2.37,5.34-1.59,15.34,5.21,16,2.77.27,5.41-1.06,6.75-3.91Z"/>
+      <path fill="#07162c" d="M424.46,268.47c-3.08-1.09-4.33-3.74-4.34-6.48-.03-6.73,8.46-8.15,15.71-9.49.45-1.68.72-4.21-.61-5.61-2.03-2.15-5.75-2.01-8.18-.72-1.36.73-1.83,1.93-1.98,3.34l-4.65-.08c.95-7.2,10.13-8.94,16.5-6.14,2.18.96,3.36,2.8,3.37,5.15l.09,13.77c.01,2.02.22,3.77.81,6.03-1.54.19-2.96.21-4.61-.03-.16-1.12-.07-2.05-.83-3.13-2.93,3.35-7.1,4.87-11.28,3.39ZM428.92,265.85c5.34-.23,8.09-5.23,7.04-10.37l-9.1,3.06c-1.83.61-2.51,2.96-1.94,4.66.46,1.38,2,2.74,4,2.65Z"/>
+      <path fill="#07162c" d="M354.75,261.88l4.31-.06c-.43,4.48-4.42,6.77-8.65,7.19-5.89.58-11.07-2.19-12.82-7.97-2.46-8.11.96-17.09,8.23-18.62,3.85-.81,7.69-.23,10.31,2.51,2.81,2.93,3.18,7.06,2.91,11.15l-17.91.03c-.28,2.65.72,5.37,2.57,7.26,1.9,1.94,4.92,2.52,7.77,1.91,1.63-.35,2.94-1.3,3.28-3.41ZM355.1,252.79c-.05-3.48-1.49-5.48-3.5-6.47-2.27-1.12-4.91-.97-6.95.58-1.98,1.49-3.07,3.68-3.36,6.05l13.8-.16Z"/>
+      <path fill="#07162c" d="M299.29,268.41c-6.42,1.93-13.84-.2-14.2-6.6,1.48-.34,2.83-.32,4.23-.03.28,2.22,1.77,3.36,3.82,3.61,2.35.29,4.75.08,6.48-1.61.87-.84,1.29-1.99,1.06-3.2-.19-.98-1.11-2.03-2.41-2.44l-7.65-2.46c-1.71-.55-3.4-1.71-4.11-3.43-1.59-3.9.59-8.17,4.59-9.48,5.63-1.85,13.13-.51,13.37,5.7l-4.15-.02c-.86-3.18-5.75-3.65-8.64-1.82-1.07.68-1.56,1.76-1.5,2.86s.99,2.16,2.3,2.55l7.71,2.34c1.6.48,3.39,1.35,4.16,2.99,2.02,4.33-.25,9.59-5.05,11.04Z"/>
+      <path fill="#07162c" d="M329.05,265.29c.65.27.5,2.33.1,3.03-2.25.69-4.66.94-6.94.43-3.5-.79-5.66-3.57-5.69-7.08l-.11-15.29-4.31-.05v-3.58s4.28-.06,4.28-.06l.06-5.89h4.23s.07,5.87.07,5.87l7.44.11v3.56s-7.45.03-7.45.03l.11,14.45c.02,2.78,1.77,4.68,4.65,4.7.91,0,2.29-.77,3.57-.24Z"/>
+      <path fill="#07162c" d="M372.46,268.21l-4.23.1v-25.52s4.22-.02,4.22-.02l.2,3.86c2.32-3.27,5.65-5.29,9.81-4.31l.1,4.55c-2.58-1.18-4.69-.9-6.81.54-1.78,1.21-3.11,3.32-3.14,5.96l-.16,14.83Z"/>
+      <g>
+      <path fill="#07162c" d="M225.61,258.75l-15.8-.15-4,9.69h-4.3s14.47-35.32,14.47-35.32c1.75-.27,3.14-.28,4.81.03l13.28,35.13c-1.66.4-3.21.23-4.97.17l-3.49-9.55ZM223.95,254.74l-6.08-16.03-6.56,16.29,12.64-.26Z"/>
+      <polygon fill="#fff" points="223.95 254.74 211.31 255 217.87 238.71 223.95 254.74"/>
+      </g>
+      <path fill="#fff" d="M405.85,261.75c-1.34,2.85-3.98,4.18-6.75,3.91-6.81-.66-7.58-10.65-5.21-16,1.15-2.61,3.66-4.04,6.13-4.05,2.62-.01,4.93,1.48,6.03,4.16,1.53,3.73,1.61,8.14-.19,11.99Z"/>
+      <path fill="#fff" d="M428.92,265.85c-2,.09-3.54-1.27-4-2.65-.57-1.7.11-4.04,1.94-4.66l9.1-3.06c1.05,5.14-1.7,10.14-7.04,10.37Z"/>
+      <path fill="#fefeff" d="M355.1,252.79l-13.8.16c.29-2.38,1.38-4.56,3.36-6.05,2.04-1.54,4.68-1.7,6.95-.58,2.01.99,3.45,3,3.5,6.47Z"/>
+    </g>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.6l4.4 4.4L19 7.4"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-words" viewBox="0 0 24 24"><path d="M4 5.5h16v10H11l-4.5 3.5v-3.5H4z"/><path d="M8 9.5h8M8 12.5h5"/></symbol>
+    <symbol id="i-offline" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5.2 13a9.6 9.6 0 0 1 4-2.4"/><path d="M14.6 10.6a9.6 9.6 0 0 1 4.2 2.4"/><path d="M2 9.4a14.4 14.4 0 0 1 4.4-2.8"/><path d="M10.4 5.3A14.4 14.4 0 0 1 22 9.4"/><path d="M12 20h.01"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <header class="topbar" id="topbar" hidden>
+    <svg class="topbar__mark" viewBox="0 0 291 402" role="img" aria-label="Amsterdam Emotional Memory Lab"><use href="#aeml-mark"/></svg>
+    <div class="progress" id="progress">
+      <span class="progress__label" id="progLabel"></span>
+      <span class="progress__bar" id="progBar" aria-hidden="true"></span>
+    </div>
+    <button class="linkbtn" id="stopBtn" type="button">Sessie stoppen</button>
+  </header>
+
+  <main class="screens">
+    <!-- Start van een sessie -->
+    <section class="screen screen--intro" data-screen="intro" hidden>
+      <div class="intro">
+        <div class="intro__logo">
+          <svg viewBox="0 0 500.03 410.34" role="img" aria-label="Amsterdam Emotional Memory Lab"><use href="#aeml-mark"/><use href="#aeml-word"/></svg>
+        </div>
+        <article class="card">
+          <h1 class="card__title display-face">Waarom roept een geur zo direct een herinnering op?</h1>
+          <p>Bij zien, horen en voelen gaat de prikkel eerst langs de <strong>thalamus</strong>, een soort schakelstation in de hersenen, voordat hij de hersenschors bereikt. Bij geur gebeurt dat niet: reukprikkels gaan rechtstreeks van de neus naar de <strong>reukcortex</strong>.</p>
+          <p>Dat gebied ligt vlak naast — en is sterk verbonden met — de <strong>hippocampus</strong> (belangrijk voor herinneringen) en de <strong>amygdala</strong> (belangrijk voor emoties). Daardoor kan een geur ineens een herinnering én het bijbehorende gevoel oproepen, vaak sneller en sterker dan een geluid of beeld zou doen.</p>
+        </article>
+        <button class="btn btn--primary btn--xl" type="button" id="startBtn">Ik snap het, laten we beginnen!</button>
+      </div>
+      <div class="intro__foot">
+        <span id="connState" aria-live="polite"></span>
+        <span id="exportMsg" aria-live="polite"></span>
+        <button class="export-link" type="button" id="exportBtn">Data exporteren (csv)</button>
+      </div>
+    </section>
+
+    <!-- Welk potje -->
+    <section class="screen" data-screen="pick" hidden>
+      <div class="screen__head">
+        <h2 class="screen__title display-face">Welke geur gaan we ruiken?</h2>
+        <p class="screen__lead">Tik op het nummer dat op het potje staat.</p>
+      </div>
+      <div class="screen__body">
+        <div class="jar-grid" id="jarGrid" role="group" aria-label="Potjes"></div>
+      </div>
+      <div class="screen__actions">
+        <span></span>
+        <button class="btn btn--primary" type="button" id="pickNext" disabled>Volgende</button>
+      </div>
+    </section>
+
+    <!-- Gevoel -->
+    <section class="screen screen--split" data-screen="feel" hidden>
+      <div class="screen__head">
+        <span class="chip" id="feelChip"></span>
+        <h2 class="screen__title display-face">Hoe voelde deze geur?</h2>
+        <p class="screen__lead">Zet de stip op de goede plek. Links is niet fijn, rechts is fijn. Boven is druk en opgewonden, onder is rustig en kalm.</p>
+      </div>
+      <div class="screen__body">
+        <div class="plot-wrap feel-input" id="feelPlot" tabindex="0" role="group" aria-label="Kies hoe de geur voelde. Tik in het vlak of gebruik de pijltjestoetsen."></div>
+        <p class="feel-readout" id="feelReadout" aria-live="polite"></p>
+      </div>
+      <div class="screen__actions">
+        <button class="btn btn--quiet" type="button" data-back="pick">Terug</button>
+        <button class="btn btn--primary" type="button" id="feelNext" disabled>Volgende</button>
+      </div>
+    </section>
+
+    <!-- Woorden -->
+    <section class="screen screen--words" data-screen="words" hidden>
+      <div class="screen__head">
+        <h2 class="screen__title display-face">Waar moet je aan denken?</h2>
+        <p class="screen__lead">Typ 1-3 woorden of een korte zin per veld.</p>
+      </div>
+      <div class="screen__body">
+        <div class="fields" id="fields"></div>
+        <p class="fields__hint" id="wordsHint" aria-live="polite"></p>
+      </div>
+      <div class="screen__actions">
+        <button class="btn btn--quiet" type="button" data-back="feel">Terug</button>
+        <button class="btn btn--primary" type="button" id="wordsNext" disabled>Volgende</button>
+      </div>
+    </section>
+
+    <!-- Controleren en versturen -->
+    <section class="screen screen--split" data-screen="review" hidden>
+      <div class="screen__head">
+        <h2 class="screen__title display-face">Klopt het zo?</h2>
+        <p class="screen__lead">Kijk nog even of alles goed is. Na het versturen verklappen we welke geur het was!</p>
+      </div>
+      <div class="screen__body">
+        <div class="review">
+          <div class="review__row"><span class="review__label">Geur</span><span class="review__value" id="rvSmell"></span></div>
+          <div class="review__row">
+            <span class="review__label">Gevoel</span>
+            <div class="review__feel"><div class="plot-wrap plot-wrap--mini" id="rvPlot"></div><span class="review__value" id="rvFeel"></span></div>
+          </div>
+          <div class="review__row"><span class="review__label">Woorden</span><span class="review__value" id="rvWords"></span></div>
+        </div>
+        <div class="alert" id="sendError" role="alert" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-offline"/></svg>
+          <div>
+            <p class="alert__title">Versturen lukt even niet.</p>
+            <p>Heeft de iPad nog wifi? Probeer het zo nog een keer. Je antwoord blijft bewaard.</p>
+            <p class="alert__tech" id="sendErrorTech"></p>
+          </div>
+        </div>
+      </div>
+      <div class="screen__actions">
+        <button class="btn btn--quiet" type="button" data-back="words" id="reviewBack">Terug</button>
+        <button class="btn btn--primary btn--xl" type="button" id="sendBtn">Verstuur!</button>
+      </div>
+    </section>
+
+    <!-- Onthulling + gemiddelde van de anderen voor deze geur -->
+    <section class="screen" data-screen="reveal" hidden>
+      <div class="reveal">
+        <div class="reveal__head">
+          <p class="reveal__kicker">Geur <span class="num" id="rvlNr"></span> was…</p>
+          <h2 class="reveal__name display-face" id="rvlName"></h2>
+          <p class="screen__lead" id="rvlLead"></p>
+        </div>
+        <div class="plot-wrap reveal__plot" id="rvlPlot"></div>
+        <div class="card reveal__words">
+          <h3 class="reveal__words-title">Waar dachten de kinderen aan?</h3>
+          <div class="wordcloud wordcloud--inline" id="rvlCloud"></div>
+          <p class="reveal__words-note">Jouw woorden zijn onderstreept.</p>
+        </div>
+      </div>
+      <div class="screen__actions">
+        <button class="btn" type="button" id="rvlSecondary"></button>
+        <button class="btn btn--primary btn--xl" type="button" id="rvlPrimary"></button>
+      </div>
+    </section>
+
+    <!-- Overzicht aan het eind van de sessie -->
+    <section class="screen" data-screen="end" hidden>
+      <div class="result">
+        <div class="result__intro">
+          <h2 class="screen__title display-face">Goed gedaan!</h2>
+          <p class="screen__lead">Dit zijn al jouw antwoorden, naast het gemiddelde van de andere kinderen voor alle geuren. Tik op een geur om te zien waar iedereen aan dacht.</p>
+          <p class="result__note" id="resultNote" hidden><svg class="icon" aria-hidden="true"><use href="#i-offline"/></svg><span>Even geen verbinding: misschien zie je niet alle nieuwste antwoorden.</span></p>
+        </div>
+        <div class="result__plot">
+          <div class="plot-wrap" id="endPlot"></div>
+          <p class="plot-legend"><span><i class="lg-mean"></i>gemiddelde van de anderen</span><span><i class="lg-me"></i>jouw antwoord</span></p>
+        </div>
+        <div class="result__cards" id="endCards"></div>
+      </div>
+      <div class="screen__actions screen__actions--center">
+        <button class="btn btn--primary btn--xl" type="button" id="nextKidBtn">Volgende kind!</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="overlay__scrim" data-close></div>
+  <div class="overlay__panel card" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+    <div class="overlay__head">
+      <span id="ovDot"></span>
+      <div>
+        <h2 class="overlay__title display-face" id="ovTitle"></h2>
+        <p class="overlay__meta" id="ovMeta"></p>
+      </div>
+      <button class="icon-btn" type="button" data-close aria-label="Sluiten"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="wordcloud" id="wordcloud"></div>
+  </div>
+</div>
+
+<div class="notice" id="notice" hidden>
+  <div class="card" role="alert">
+    <h2 class="card__title display-face" id="noticeTitle"></h2>
+    <div id="noticeBody"></div>
+    <button class="btn" type="button" id="noticeBtn" hidden>Opnieuw proberen</button>
+  </div>
+</div>
+<div class="demo-badge" id="demoBadge" hidden>Demo-modus: voorbeelddata</div>
+
+<script type="module">
+/* =====================================================================
+   Geen aanpassingen nodig onder deze lijn.
+   ===================================================================== */
+const FIREBASE_SDK = "12.19.0";
+const SAVE_TIMEOUT_MS = 12000;
+
+/* ---------------------------------------------------------------------
+   Shared: smells, stats (same as display.html)
+   --------------------------------------------------------------------- */
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const rootStyle = getComputedStyle(document.documentElement);
+
+const SMELL_LIST = SMELLS.slice(0, 12).map((s, i) => {
+  const nr = Number.isFinite(Number(s.nr)) ? Number(s.nr) : i + 1;
+  const slot = (((nr - 1) % 12) + 12) % 12 + 1;
+  return {
+    id: String(nr),
+    nr,
+    label: String(s.label ?? `Geur ${nr}`),
+    color: s.color || rootStyle.getPropertyValue(`--smell-${slot}`).trim(),
+  };
+}).sort((a, b) => a.nr - b.nr);
+if (SMELLS.length > 12) console.warn("SMELLS: alleen de eerste 12 geuren worden gebruikt.");
+if (new Set(SMELL_LIST.map(s => s.id)).size !== SMELL_LIST.length) console.warn("SMELLS: twee geuren hebben hetzelfde nummer.");
+const SMELL_BY_ID = new Map(SMELL_LIST.map(s => [s.id, s]));
+
+function cleanDoc(raw) {
+  if (!raw || !SMELL_BY_ID.has(String(raw.smellId))) return null;
+  const v = Number(raw.valence), a = Number(raw.arousal);
+  if (!Number.isFinite(v) || !Number.isFinite(a)) return null;
+  const words = Array.isArray(raw.words)
+    ? raw.words.filter(w => typeof w === "string").map(w => w.trim()).filter(Boolean).slice(0, 3)
+    : [];
+  return { id: raw.id, smellId: String(raw.smellId), valence: clamp(v, -1, 1), arousal: clamp(a, -1, 1), words, sessionId: raw.sessionId || null };
+}
+
+function computeStats(docs) {
+  const groups = new Map();
+  for (const d of docs) {
+    if (!groups.has(d.smellId)) groups.set(d.smellId, []);
+    groups.get(d.smellId).push(d);
+  }
+  const stats = new Map();
+  for (const [id, arr] of groups) {
+    const n = arr.length;
+    const mv = arr.reduce((s, d) => s + d.valence, 0) / n;
+    const ma = arr.reduce((s, d) => s + d.arousal, 0) / n;
+    const sd = (key, m) => n > 1 ? Math.sqrt(arr.reduce((s, d) => s + (d[key] - m) ** 2, 0) / (n - 1)) : 0;
+    stats.set(id, { n, mv, ma, sv: sd("valence", mv), sa: sd("arousal", ma) });
+  }
+  return stats;
+}
+
+/* Text on a smell-coloured dot: white where it holds 3:1, navy otherwise. */
+function inkOn(hex) {
+  const lin = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const L = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+  return 1.05 / (L + 0.05) >= 3 ? "#FFFFFF" : "#07162C";
+}
+const nrDot = smell => `<span class="nr-dot" style="--c:${smell.color};--ink:${inkOn(smell.color)}" aria-hidden="true">${smell.nr}</span>`;
+
+/* Plain-language reading of a point, for kids and the adults reading along. */
+function describe(v, a) {
+  const val = v < -0.6 ? "heel onaangenaam" : v < -0.2 ? "onaangenaam" : v <= 0.2 ? "neutraal" : v <= 0.6 ? "aangenaam" : "heel aangenaam";
+  const aro = a < -0.6 ? "heel kalm" : a < -0.2 ? "kalm" : a <= 0.2 ? "" : a <= 0.6 ? "opgewonden" : "heel opgewonden";
+  return aro ? `${val} en ${aro}` : val;
+}
+
+/* ---------------------------------------------------------------------
+   Shared: the valence–arousal plot (same geometry as display.html)
+   --------------------------------------------------------------------- */
+const NS = "http://www.w3.org/2000/svg";
+const G = { W: 1400, H: 1000, X0: 300, Y0: 100, S: 800 };
+const UNIT = G.S / 2;
+const px = v => G.X0 + ((v + 1) / 2) * G.S;
+const py = a => G.Y0 + ((1 - a) / 2) * G.S;
+const MIN_SD = 0.07;
+
+function svgEl(name, attrs = {}, parent) {
+  const n = document.createElementNS(NS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+const FACES = {
+  unpleasant: '<circle cx="12" cy="12" r="9.5"/><path d="M9 9.2v1.6M15 9.2v1.6"/><path d="M8.4 16.6q3.6-3.2 7.2 0"/>',
+  pleasant:   '<circle cx="12" cy="12" r="9.5"/><path d="M9 9.2v1.6M15 9.2v1.6"/><path d="M8.2 14.2q3.8 3.8 7.6 0"/>',
+  calm:       '<circle cx="12" cy="12" r="9.5"/><path d="M7.6 10.6q1.4 1.2 2.8 0M13.6 10.6q1.4 1.2 2.8 0"/><path d="M10 15.6h4"/>',
+  aroused:    '<circle cx="12" cy="12" r="9.5"/><path d="M7.6 6.9q1.4-1 2.8 0M13.6 6.9q1.4-1 2.8 0"/><circle cx="9" cy="10.2" r="1.2"/><circle cx="15" cy="10.2" r="1.2"/><ellipse cx="12" cy="15.8" rx="1.9" ry="2.3"/>',
+};
+
+const measureCtx = document.createElement("canvas").getContext("2d");
+function textWidth(text, font) { measureCtx.font = font; return measureCtx.measureText(text).width; }
+const FONT_BASE = "'DM Sans', system-ui, sans-serif";
+
+let plotCount = 0;
+function buildPlot(host) {
+  const prefix = `p${++plotCount}`;
+  const svg = svgEl("svg", { viewBox: `0 0 ${G.W} ${G.H}`, class: "va-plot", "aria-hidden": "true" });
+  const defs = svgEl("defs", {}, svg);
+  const clip = svgEl("clipPath", { id: `${prefix}-clip` }, defs);
+  svgEl("rect", { width: G.W, height: G.H, rx: G.H / 2 }, clip);
+  const soft = svgEl("filter", { id: `${prefix}-soft`, x: "-60%", y: "-60%", width: "220%", height: "220%" }, defs);
+  svgEl("feGaussianBlur", { stdDeviation: 18 }, soft);
+
+  svgEl("rect", { class: "va-pill", width: G.W, height: G.H, rx: G.H / 2 }, svg);
+
+  const grid = svgEl("g", { class: "va-grid" }, svg);
+  for (const t of [-1, -0.5, 0, 0.5, 1]) {
+    const cls = t === 0 ? "is-zero" : Math.abs(t) === 1 ? "is-edge" : "";
+    svgEl("line", { x1: px(t), x2: px(t), y1: G.Y0, y2: G.Y0 + G.S, class: cls }, grid);
+    svgEl("line", { x1: G.X0, x2: G.X0 + G.S, y1: py(t), y2: py(t), class: cls }, grid);
+  }
+
+  const axes = svgEl("g", { class: "va-axes" }, svg);
+  const faces = {};
+  const face = (key, cx, cy, size) => {
+    const g = svgEl("g", { class: `va-face-wrap va-face-wrap--${key}` }, axes);
+    const inner = svgEl("g", { class: "va-face", transform: `translate(${cx - size / 2} ${cy - size / 2}) scale(${size / 24})` }, g);
+    inner.innerHTML = FACES[key];
+    faces[key] = g;
+  };
+  const capX = G.X0 / 2;
+  face("unpleasant", capX, 440, 88);
+  svgEl("text", { class: "va-axis-label", x: capX, y: 536, "text-anchor": "middle" }, faces.unpleasant).textContent = "onaangenaam";
+  face("pleasant", G.W - capX, 440, 88);
+  svgEl("text", { class: "va-axis-label", x: G.W - capX, y: 536, "text-anchor": "middle" }, faces.pleasant).textContent = "aangenaam";
+  const inline = [];
+  const addInline = (key, word, cy) => {
+    face(key, 0, cy, 56);
+    const text = svgEl("text", { class: "va-axis-label", y: cy + 12.5 }, faces[key]);
+    text.textContent = word;
+    inline.push({ key, word, cy, text });
+  };
+  const layoutInline = () => {
+    for (const { key, word, cy, text } of inline) {
+      const size = 56, gap = 14;
+      const w = textWidth(word, `600 36px ${FONT_BASE}`);
+      const x0 = G.W / 2 - (size + gap + w) / 2;
+      faces[key].firstElementChild.setAttribute("transform", `translate(${x0} ${cy - size / 2}) scale(${size / 24})`);
+      text.setAttribute("x", x0 + size + gap);
+    }
+  };
+  addInline("aroused", "opgewonden", G.Y0 / 2);
+  addInline("calm", "kalm", G.H - G.Y0 / 2);
+  layoutInline();
+  document.fonts?.ready.then(layoutInline);
+
+  const clouds = svgEl("g", { class: "va-clouds", "clip-path": `url(#${prefix}-clip)` }, svg);
+  const links = svgEl("g", { class: "va-links" }, svg);
+  const markers = svgEl("g", { class: "va-markers" }, svg);
+  const top = svgEl("g", { class: "va-top" }, svg);
+  host.appendChild(svg);
+  return { svg, clouds, links, markers, top, faces, filterId: `${prefix}-soft` };
+}
+function clearPlot(plot) {
+  for (const layer of [plot.clouds, plot.links, plot.markers, plot.top]) layer.replaceChildren();
+}
+
+function drawCloud(plot, smell, st) {
+  const rx = Math.max(st.sv, MIN_SD) * UNIT, ry = Math.max(st.sa, MIN_SD) * UNIT;
+  const g = svgEl("g", { class: "cloud clickable", transform: `translate(${px(st.mv)} ${py(st.ma)})`, "data-id": smell.id }, plot.clouds);
+  const haloWrap = svgEl("g", { filter: `url(#${plot.filterId})` }, g);
+  svgEl("ellipse", { class: "cloud__halo", rx: rx * 1.5, ry: ry * 1.5, fill: smell.color, "fill-opacity": 0.2 }, haloWrap);
+  svgEl("ellipse", {
+    class: "cloud__body", rx, ry, fill: smell.color, "fill-opacity": 0.2,
+    stroke: smell.color, "stroke-opacity": 0.7, "stroke-width": 1.5,
+  }, g);
+  svgEl("ellipse", { class: "cloud__core", rx: rx * 0.5, ry: ry * 0.5, fill: smell.color, "fill-opacity": 0.22 }, g);
+  return g;
+}
+
+function drawMean(parent, smell, cx, cy, { r = 21, number = true } = {}) {
+  const m = svgEl("g", { class: "mean clickable", transform: `translate(${cx} ${cy})`, "data-id": smell.id }, parent);
+  svgEl("circle", { class: "hit", r: Math.max(46, r + 20) }, m);
+  svgEl("circle", { class: "mean__ring", r }, m);
+  svgEl("circle", { class: "mean__fill", r, fill: smell.color }, m);
+  if (number) svgEl("text", { class: "dot-nr", y: 9, fill: inkOn(smell.color) }, m).textContent = smell.nr;
+  return m;
+}
+
+/* The child's own answer. With `number` it carries the smell number (end
+   overview, where there are several); otherwise it is labelled "jij". */
+function drawMe(parent, v, a, { big = false, label = true, pop = false, number = null, id = null } = {}) {
+  const x = px(v), y = py(a);
+  const g = svgEl("g", { class: `me${id ? " clickable" : ""}`, transform: `translate(${x} ${y})` }, parent);
+  if (id) g.setAttribute("data-id", id);
+  const p = svgEl("g", { class: `me__pop${pop ? " is-new" : ""}` }, g);
+  const r = big ? 24 : number != null ? 20 : 17;
+  if (id) svgEl("circle", { class: "hit", r: 46 }, p);
+  svgEl("circle", { class: "me__outer", r: r + 10 }, p);
+  svgEl("circle", { class: "me__gap", r: r + 4.5 }, p);
+  svgEl("circle", { class: "me__dot", r }, p);
+  if (number != null) svgEl("text", { class: "dot-nr", y: 9, fill: "#FFFFFF" }, p).textContent = number;
+  if (label && number == null) {
+    const right = v < 0.72;
+    svgEl("text", {
+      class: "me__label", x: right ? r + 16 : -(r + 16), y: -(r + 4),
+      "text-anchor": right ? "start" : "end",
+    }, g).textContent = "jij";
+  }
+  return g;
+}
+
+/* ---------------------------------------------------------------------
+   Shared: data sources (Firebase, or ?demo for local testing)
+   --------------------------------------------------------------------- */
+const params = new URLSearchParams(location.search);
+const DEMO = params.has("demo");
+const isConfigured = cfg => !!cfg && typeof cfg.projectId === "string" && cfg.projectId.length > 0 && !/VUL-HIER-IN/i.test(JSON.stringify(cfg));
+
+async function createFirebaseStore() {
+  const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK}`;
+  const [{ initializeApp }, fs] = await Promise.all([
+    import(`${base}/firebase-app.js`),
+    import(`${base}/firebase-firestore.js`),
+  ]);
+  const app = initializeApp(firebaseConfig);
+  // Long-polling fallback keeps the connection alive on restrictive
+  // (eduroam-style) networks and proxies that break streaming.
+  const db = fs.initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+  const col = fs.collection(db, "responses");
+  const plain = d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) });
+  return {
+    demo: false,
+    subscribe(onData, onStatus) {
+      let unsub = null, timer = null, attempt = 0;
+      const start = () => {
+        clearTimeout(timer);
+        timer = null;
+        unsub = fs.onSnapshot(col, { includeMetadataChanges: true },
+          snap => {
+            attempt = 0;
+            onData(snap.docs.map(plain));
+            onStatus(snap.metadata.fromCache ? "cache" : "live");
+          },
+          err => {
+            unsub = null;
+            const wait = Math.min(30000, 3000 * 2 ** attempt++);
+            onStatus("error", { err, retryAt: Date.now() + wait });
+            timer = setTimeout(start, wait);
+          });
+      };
+      start();
+      return { retryNow() { if (!unsub) start(); } };
+    },
+    newId: () => fs.doc(col).id,
+    // A fixed document id makes a retry overwrite the same answer instead
+    // of adding a second copy when the first attempt did get through.
+    save: (id, data) => fs.setDoc(fs.doc(col, id), { ...data, timestamp: fs.serverTimestamp() }),
+    fetchAll: async () => (await fs.getDocs(col)).docs.map(plain),
+  };
+}
+
+function createDemoStore() {
+  const KEY = "geur-geheugen-demo-v2";
+  if (params.get("demo") === "reset") { try { localStorage.removeItem(KEY); } catch {} }
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } };
+  const write = l => { try { localStorage.setItem(KEY, JSON.stringify(l)); } catch {} };
+  let list = read();
+  if (!Array.isArray(list)) { list = seedDemo(); write(list); }
+  const listeners = new Set();
+  const snapshot = () => list.map(r => ({ ...r, timestamp: new Date(r.timestamp) }));
+  const emit = () => listeners.forEach(fn => fn(snapshot()));
+  addEventListener("storage", e => { if (e.key === KEY) { list = read() || []; emit(); } });
+  return {
+    demo: true,
+    subscribe(onData, onStatus) {
+      listeners.add(onData);
+      setTimeout(() => { onData(snapshot()); onStatus("live"); }, 150);
+      return { retryNow() {} };
+    },
+    newId: () => "demo-" + Math.random().toString(36).slice(2, 12),
+    async save(id, data) {
+      await new Promise(r => setTimeout(r, 400));
+      list = list.filter(r => r.id !== id).concat({ id, ...data, timestamp: new Date().toISOString() });
+      write(list);
+      emit();
+    },
+    fetchAll: async () => snapshot(),
+  };
+}
+
+function seedDemo() {
+  let s = 20260930;
+  const rand = () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const gauss = () => Math.sqrt(-2 * Math.log(rand() + 1e-9)) * Math.cos(2 * Math.PI * rand());
+  const pick = arr => arr[Math.floor(rand() * arr.length)];
+  const generic = ["oma", "vakantie", "zomer", "thuis", "school", "keuken", "tuin", "verjaardag", "bos", "regen", "opa", "camping", "zwembad", "winter", "fiets", "boerderij", "mama", "papa", "logeren", "feest"];
+  const themed = {
+    "kaneel": ["kerst", "appeltaart", "oma", "koekjes", "warm", "speculaas"],
+    "vers gemaaid gras": ["voetbal", "zomer", "tuin", "picknick", "buiten", "grasmaaier"],
+    "zee": ["strand", "vakantie", "zout", "golven", "zandkastelen", "schelpen"],
+    "lavendel": ["oma", "slapen", "kast", "Frankrijk", "rust", "zeep"],
+    "aardbei": ["snoep", "zomer", "ijsje", "taart", "kauwgom", "slagroom"],
+    "pepermunt": ["tandpasta", "kauwgom", "fris", "snoep", "winter", "koud"],
+    "koffie": ["papa", "ochtend", "mama", "bitter", "werk", "cafe"],
+    "citroen": ["zuur", "limonade", "zomer", "schoonmaken", "thee", "fris"],
+    "vanille": ["ijsje", "pudding", "taart", "zoet", "bakken", "vla"],
+    "chocolade": ["pasen", "sinterklaas", "lekker", "taart", "koekjes", "warme chocomel"],
+    "sinaasappel": ["sap", "ontbijt", "school", "fruit", "sinterklaas", "vitamine"],
+    "roos": ["tuin", "oma", "bloemen", "moederdag", "parfum", "bruiloft"],
+  };
+  const centres = new Map(SMELL_LIST.map(sm => [sm.id, { v: rand() * 1.4 - 0.6, a: rand() * 1.4 - 0.7, sp: 0.14 + rand() * 0.22 }]));
+  const out = [];
+  let t = Date.now() - 1000 * 60 * 60 * 3;
+  for (let k = 0; k < 24; k++) {
+    const sessionId = `demo-s-${k}`;
+    const order = SMELL_LIST.map(sm => sm.id).sort(() => rand() - 0.5).slice(0, 3 + Math.floor(rand() * 4));
+    order.forEach((smellId, i) => {
+      const c = centres.get(smellId);
+      const pool = themed[SMELL_BY_ID.get(smellId).label.toLowerCase()] || generic;
+      const words = [...new Set(Array.from({ length: 2 + Math.floor(rand() * 2) }, () => rand() < 0.7 ? pick(pool) : pick(generic)))];
+      out.push({
+        id: `demo-seed-${out.length}`,
+        smellId,
+        valence: +clamp(c.v + gauss() * c.sp, -1, 1).toFixed(3),
+        arousal: +clamp(c.a + gauss() * c.sp * 1.1, -1, 1).toFixed(3),
+        words,
+        sessionId,
+        position: i + 1,
+        timestamp: new Date((t += 30000 + rand() * 60000)).toISOString(),
+      });
+    });
+  }
+  return out;
+}
+
+/* =====================================================================
+   Tablet
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const SESSION_SCREENS = ["pick", "feel", "words", "review", "reveal"];
+const screens = [...document.querySelectorAll(".screen")];
+const target = clamp(Math.round(Number(SMELLS_PER_SESSION) || 5), 1, SMELL_LIST.length);
+
+const state = { screen: "intro" };
+const session = { id: null, done: [] };   // done: answers already sent, in order
+const current = { smellId: null, point: null, words: ["", "", ""], pendingId: null };
+let store = null;
+let connection = "connecting";
+let allDocs = [];
+let sending = false;
+
+function newSessionId() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return "s-" + Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+}
+
+/* ---- Navigation ------------------------------------------------------- */
+function go(name) {
+  document.activeElement?.blur?.();
+  state.screen = name;
+  for (const s of screens) {
+    const on = s.dataset.screen === name;
+    s.hidden = !on;
+    if (on) {
+      s.classList.remove("is-entering");
+      void s.offsetWidth;
+      s.classList.add("is-entering");
+      s.scrollTop = 0;
+    }
+  }
+  const inSession = SESSION_SCREENS.includes(name);
+  $("topbar").hidden = name === "intro";
+  $("progress").style.visibility = inSession ? "visible" : "hidden";
+  $("stopBtn").hidden = !inSession;
+  if (inSession) renderProgress();
+  if (name === "pick") renderJars();
+  if (name === "feel") enterFeel();
+  if (name === "review") enterReview();
+  if (name === "reveal") renderReveal();
+  if (name === "end") renderEnd({ pop: true });
+}
+
+/* "Geur 2 van 5" — past the target it simply keeps counting. */
+function renderProgress() {
+  const done = session.done.length;
+  const n = state.screen === "reveal" ? done : done + 1;
+  $("progLabel").innerHTML = n <= target
+    ? `Geur <span class="num">${n}</span> van <span class="num">${target}</span>`
+    : `Geur <span class="num">${n}</span> (extra)`;
+  const total = Math.max(target, n);
+  $("progBar").innerHTML = Array.from({ length: total }, (_, i) => {
+    const cls = i < n - 1 || (i === n - 1 && state.screen === "reveal") ? "is-done" : i === n - 1 ? "is-current" : "";
+    return `<i class="${cls}"></i>`;
+  }).join("");
+}
+
+document.addEventListener("click", e => {
+  const back = e.target.closest("[data-back]");
+  if (back) go(back.dataset.back);
+});
+
+function resetCurrent() {
+  current.smellId = null;
+  current.point = null;
+  current.words = ["", "", ""];
+  current.pendingId = null;
+  fieldInputs.forEach(i => (i.value = ""));
+  renderFeel();
+  updateWords();
+  $("sendError").hidden = true;
+}
+function startSession() {
+  session.id = newSessionId();
+  session.done = [];
+  resetCurrent();
+  go("pick");
+}
+function finishSession() {
+  resetCurrent();
+  go(session.done.length ? "end" : "intro");
+}
+$("startBtn").addEventListener("click", startSession);
+$("nextKidBtn").addEventListener("click", () => go("intro"));
+$("stopBtn").addEventListener("click", () => {
+  const msg = session.done.length
+    ? "Sessie stoppen en naar het overzicht? Wat al verstuurd is, blijft bewaard."
+    : "Sessie stoppen en terug naar het begin?";
+  if (confirm(msg)) finishSession();
+});
+
+/* ---- Pick: the supervisor taps the jar number ----------------------------- */
+function renderJars() {
+  const smelled = new Set(session.done.map(d => d.smellId));
+  $("jarGrid").innerHTML = SMELL_LIST.map(s => {
+    const done = smelled.has(s.id);
+    return `
+      <button class="jar" type="button" data-id="${s.id}" aria-pressed="${s.id === current.smellId}"
+              ${done ? `disabled aria-label="Geur ${s.nr}, al geroken"` : `aria-label="Geur ${s.nr}"`}>
+        <span class="jar__nr num">${s.nr}</span>
+        <svg class="jar__check icon" aria-hidden="true"><use href="#i-check"/></svg>
+        ${done ? '<span class="jar__done">al geroken</span>' : ""}
+      </button>`;
+  }).join("");
+  renderJarChoice();
+}
+function renderJarChoice() {
+  for (const jar of $("jarGrid").children) jar.setAttribute("aria-pressed", String(jar.dataset.id === current.smellId));
+  $("jarGrid").classList.toggle("has-choice", !!current.smellId);
+  $("pickNext").disabled = !current.smellId;
+}
+$("jarGrid").addEventListener("click", e => {
+  const jar = e.target.closest(".jar");
+  if (!jar || jar.disabled) return;
+  current.smellId = jar.dataset.id;
+  renderJarChoice();
+});
+$("pickNext").addEventListener("click", () => current.smellId && go("feel"));
+
+/* ---- Feel: valence/arousal ------------------------------------------------- */
+const feelPlot = buildPlot($("feelPlot"));
+const feelHint = svgEl("text", { class: "va-hint", x: G.W / 2, y: G.H / 2 + 14 }, feelPlot.top);
+feelHint.textContent = "Tik ergens in het vlak";
+let feelMe = null;
+
+function enterFeel() {
+  const smell = SMELL_BY_ID.get(current.smellId);
+  $("feelChip").innerHTML = smell ? `Geur <span class="num">${smell.nr}</span>` : "";
+}
+function renderFeel(pop = false) {
+  const p = current.point;
+  feelHint.style.display = p ? "none" : "";
+  if (feelMe) { feelMe.remove(); feelMe = null; }
+  const pull = p ? { pleasant: p.v, unpleasant: -p.v, aroused: p.a, calm: -p.a } : null;
+  for (const key in feelPlot.faces) {
+    feelPlot.faces[key].style.opacity = pull ? (0.3 + 0.7 * clamp(pull[key], 0, 1)).toFixed(2) : "1";
+  }
+  if (p) feelMe = drawMe(feelPlot.top, p.v, p.a, { big: true, label: false, pop });
+  $("feelReadout").innerHTML = p ? `Jij vond het <b>${describe(p.v, p.a)}</b>.` : "";
+  $("feelNext").disabled = !p;
+}
+function setPointFromEvent(e, pop) {
+  const svg = feelPlot.svg;
+  const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+  current.point = { v: clamp((pt.x - px(0)) / UNIT, -1, 1), a: clamp((py(0) - pt.y) / UNIT, -1, 1) };
+  renderFeel(pop);
+}
+let dragging = null;
+$("feelPlot").addEventListener("pointerdown", e => {
+  e.preventDefault();
+  dragging = e.pointerId;
+  $("feelPlot").setPointerCapture(e.pointerId);
+  setPointFromEvent(e, !current.point);
+});
+$("feelPlot").addEventListener("pointermove", e => { if (e.pointerId === dragging) setPointFromEvent(e, false); });
+const endDrag = e => { if (e.pointerId === dragging) dragging = null; };
+$("feelPlot").addEventListener("pointerup", endDrag);
+$("feelPlot").addEventListener("pointercancel", endDrag);
+$("feelPlot").addEventListener("keydown", e => {
+  const step = e.shiftKey ? 0.2 : 0.05;
+  const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
+  if (!d) return;
+  e.preventDefault();
+  const first = !current.point;
+  const p = current.point || { v: 0, a: 0 };
+  current.point = first ? p : { v: clamp(p.v + d[0], -1, 1), a: clamp(p.a + d[1], -1, 1) };
+  renderFeel(first);
+});
+$("feelNext").addEventListener("click", () => current.point && go("words"));
+
+/* ---- Words --------------------------------------------------------------------- */
+const FIELD_LABELS = ["Eerste gedachte", "Tweede gedachte", "Derde gedachte"];
+const minWords = clamp(Math.round(Number(MIN_WORDS) || 1), 1, 3);
+$("fields").innerHTML = FIELD_LABELS.map((label, i) => `
+  <label class="field">
+    <span class="field__label">${label}${i >= minWords ? " (mag leeg blijven)" : ""}</span>
+    <input class="field__input" type="text" maxlength="60" autocomplete="off" autocorrect="on"
+           autocapitalize="off" spellcheck="true" enterkeyhint="${i < 2 ? "next" : "done"}" data-i="${i}">
+  </label>`).join("");
+const fieldInputs = [...$("fields").querySelectorAll("input")];
+const filledWords = () => current.words.map(w => w.trim().replace(/\s+/g, " ")).filter(Boolean);
+
+function updateWords() {
+  const left = Math.max(0, minWords - filledWords().length);
+  $("wordsNext").disabled = left > 0;
+  $("wordsHint").textContent = left > 1 ? `Nog ${left} te gaan.` : left === 1 ? "Nog 1 te gaan." : "Top! Je kunt verder.";
+}
+fieldInputs.forEach((input, i) => {
+  input.addEventListener("input", () => { current.words[i] = input.value; updateWords(); });
+  input.addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (i < fieldInputs.length - 1) fieldInputs[i + 1].focus();
+    else if (!$("wordsNext").disabled) go("review");
+    else input.blur();
+  });
+});
+$("wordsNext").addEventListener("click", () => filledWords().length >= minWords && go("review"));
+
+/* ---- Review + send ------------------------------------------------------------------ */
+const reviewPlot = buildPlot($("rvPlot"));
+let reviewMe = null;
+
+function enterReview() {
+  const smell = SMELL_BY_ID.get(current.smellId);
+  const p = current.point;
+  $("rvSmell").innerHTML = smell ? `Geur <span class="num">${smell.nr}</span>` : "";
+  reviewMe?.remove();
+  reviewMe = p ? drawMe(reviewPlot.top, p.v, p.a, { label: false }) : null;
+  $("rvFeel").textContent = p ? describe(p.v, p.a) : "";
+  $("rvWords").innerHTML = filledWords().map(w => `<span class="word-chip">${escapeHtml(w)}</span>`).join("");
+  $("sendError").hidden = true;
+  setSendButton("idle");
+}
+function setSendButton(mode) {
+  const btn = $("sendBtn");
+  btn.disabled = mode === "sending";
+  $("reviewBack").disabled = mode === "sending";
+  btn.textContent = mode === "sending" ? "Versturen…" : mode === "retry" ? "Opnieuw proberen" : "Verstuur!";
+}
+function withTimeout(promise, ms, code = "timeout") {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error(code), { code })), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+async function send() {
+  if (sending) return;
+  sending = true;
+  setSendButton("sending");
+  $("sendError").hidden = true;
+  const data = {
+    smellId: current.smellId,
+    valence: Math.round(current.point.v * 1000) / 1000,
+    arousal: Math.round(current.point.a * 1000) / 1000,
+    words: filledWords(),
+    sessionId: session.id,
+    position: session.done.length + 1,
+  };
+  try {
+    if (!store) throw Object.assign(new Error("Nog geen verbinding met de database"), { code: "no-store" });
+    current.pendingId ||= store.newId();
+    await withTimeout(store.save(current.pendingId, data), SAVE_TIMEOUT_MS);
+    session.done.push({ id: current.pendingId, ...data });
+    sending = false;
+    resetCurrent();
+    go("reveal");
+  } catch (err) {
+    console.error("Versturen mislukt:", err);
+    sending = false;
+    const code = err?.code || err?.message || "onbekend";
+    $("sendErrorTech").textContent =
+      code === "permission-denied" ? "Technisch: permission-denied. Kijk of de Firestore-regels schrijven toestaan (test mode verloopt na 30 dagen)."
+      : code === "timeout" ? `Technisch: geen bevestiging van de server binnen ${SAVE_TIMEOUT_MS / 1000} s.`
+      : `Technisch: ${code}`;
+    $("sendError").hidden = false;
+    setSendButton("retry");
+  }
+}
+$("sendBtn").addEventListener("click", send);
+
+/* ---- Shared result helpers -------------------------------------------------------------- */
+const isMine = d => (d.sessionId && d.sessionId === session.id) || session.done.some(x => x.id === d.id);
+
+function resultDocs() {
+  const docs = allDocs.map(cleanDoc).filter(Boolean);
+  // The listener normally echoes our own writes straight back; if it has not
+  // yet (slow connection), count them anyway so the child sees their answers.
+  const ids = new Set(docs.map(d => d.id));
+  for (const d of session.done) if (!ids.has(d.id)) docs.push(cleanDoc(d));
+  return docs.filter(Boolean);
+}
+
+const normWord = w => w.toLowerCase().replace(/\s+/g, " ").trim();
+function wordData(smellId) {
+  const docs = resultDocs().filter(d => d.smellId === smellId);
+  const mine = new Set(session.done.filter(d => d.smellId === smellId).flatMap(d => d.words).map(normWord));
+  const counts = new Map();
+  for (const d of docs) for (const w of d.words) {
+    const key = normWord(w);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const all = [...counts].map(([text, count]) => ({ text, count, mine: mine.has(text) }))
+    .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text, "nl"));
+  const entries = all.slice(0, 80).concat(all.slice(80).filter(e => e.mine));
+  return { entries, total: all.reduce((s, e) => s + e.count, 0) };
+}
+
+/* ---- Reveal: the name, the others' average, the word cloud ------------------------------- */
+const revealPlot = buildPlot($("rvlPlot"));
+let revealCloudKey = "";
+
+function renderReveal() {
+  const mine = session.done[session.done.length - 1];
+  if (!mine) return;
+  const smell = SMELL_BY_ID.get(mine.smellId);
+  $("rvlNr").textContent = smell.nr;
+  $("rvlName").innerHTML = `${nrDot(smell)}<span>${escapeHtml(smell.label)}</span>`;
+  renderRevealPlot(true);
+  renderRevealActions();
+}
+
+function renderRevealPlot(pop = false) {
+  const mine = session.done[session.done.length - 1];
+  if (!mine) return;
+  const smell = SMELL_BY_ID.get(mine.smellId);
+  const others = resultDocs().filter(d => d.smellId === smell.id && !isMine(d));
+  const st = computeStats(others).get(smell.id);
+  clearPlot(revealPlot);
+  if (st) {
+    drawCloud(revealPlot, smell, st);
+    svgEl("line", { class: "me__link", x1: px(mine.valence), y1: py(mine.arousal), x2: px(st.mv), y2: py(st.ma) }, revealPlot.links);
+    drawMean(revealPlot.markers, smell, px(st.mv), py(st.ma), { number: false });
+    // "gemiddeld" goes under the average, or above it when the child's dot is there
+    const below = !(mine.arousal < st.ma && Math.abs(mine.valence - st.mv) < 0.3);
+    svgEl("text", { class: "va-note", x: px(st.mv), y: py(st.ma) + (below ? 68 : -40), "text-anchor": "middle" }, revealPlot.top).textContent = "gemiddeld";
+  }
+  drawMe(revealPlot.top, mine.valence, mine.arousal, { pop });
+  $("rvlLead").textContent = st
+    ? `De gekleurde stip is het gemiddelde van ${st.n === 1 ? "1 ander kind" : `${st.n} andere kinderen`}, de wolk laat zien hoe verschillend zij het vonden. Jij bent de donkere stip.`
+    : "Jij bent de eerste die deze geur heeft geroken! Er is nog geen gemiddelde van anderen.";
+  // Re-lay the word cloud only when the words change, so it does not jump
+  const { entries } = wordData(smell.id);
+  const key = smell.id + "|" + entries.map(e => e.text + e.count).join(",");
+  if (key !== revealCloudKey || pop) {
+    revealCloudKey = key;
+    layoutWordCloud($("rvlCloud"), entries);
+  }
+}
+
+function renderRevealActions() {
+  const done = session.done.length;
+  const left = SMELL_LIST.length - done;
+  const primary = $("rvlPrimary"), secondary = $("rvlSecondary");
+  if (left === 0) {
+    secondary.hidden = true;
+    primary.textContent = "Afronden";
+    primary.dataset.action = "end";
+  } else if (done < target) {
+    secondary.hidden = false;
+    secondary.textContent = "Stoppen";
+    secondary.dataset.action = "end";
+    primary.textContent = "Volgende geur";
+    primary.dataset.action = "next";
+  } else {
+    secondary.hidden = false;
+    secondary.textContent = "Nog een geur";
+    secondary.dataset.action = "next";
+    primary.textContent = "Afronden";
+    primary.dataset.action = "end";
+  }
+}
+for (const id of ["rvlPrimary", "rvlSecondary"]) {
+  $(id).addEventListener("click", e => {
+    if (e.currentTarget.dataset.action === "next") { resetCurrent(); go("pick"); }
+    else go("end");
+  });
+}
+
+/* ---- End: own answers next to the others' averages for all smells ------------------------ */
+const endPlot = buildPlot($("endPlot"));
+
+function renderEnd({ pop = false } = {}) {
+  const docs = resultDocs();
+  const stats = computeStats(docs.filter(d => !isMine(d)));
+  clearPlot(endPlot);
+  for (const smell of SMELL_LIST) {
+    const st = stats.get(smell.id);
+    if (st) drawMean(endPlot.markers, smell, px(st.mv), py(st.ma));
+  }
+  for (const d of session.done) {
+    const st = stats.get(d.smellId);
+    if (st) svgEl("line", { class: "me__link", x1: px(d.valence), y1: py(d.arousal), x2: px(st.mv), y2: py(st.ma) }, endPlot.links);
+    drawMe(endPlot.top, d.valence, d.arousal, { number: SMELL_BY_ID.get(d.smellId).nr, id: d.smellId, pop });
+  }
+  renderEndCards(stats);
+  $("resultNote").hidden = connection === "live";
+}
+
+function renderEndCards(stats) {
+  const mineById = new Map(session.done.map(d => [d.smellId, d]));
+  const ordered = [
+    ...session.done.map(d => SMELL_BY_ID.get(d.smellId)),
+    ...SMELL_LIST.filter(s => !mineById.has(s.id)),
+  ];
+  $("endCards").innerHTML = ordered.map(s => {
+    const st = stats.get(s.id), mine = mineById.get(s.id);
+    const others = st ? `${st.n}× geroken · ${describe(st.mv, st.ma)}` : "nog niet door anderen geroken";
+    const meta = mine ? `<b>Jij: ${describe(mine.valence, mine.arousal)}</b><br>Anderen: ${st ? describe(st.mv, st.ma) : "nog niemand"}` : others;
+    return `
+      <button class="result-card${mine ? " is-mine" : ""}" type="button" data-id="${s.id}">
+        ${nrDot(s)}
+        <span>
+          <span class="result-card__name display-face">${escapeHtml(s.label)}</span>
+          <span class="result-card__meta">${meta}</span>
+        </span>
+        <svg class="icon result-card__icon" aria-hidden="true"><use href="#i-words"/></svg>
+      </button>`;
+  }).join("");
+}
+$("endCards").addEventListener("click", e => {
+  const card = e.target.closest(".result-card");
+  if (card) openWords(card.dataset.id, card);
+});
+endPlot.svg.addEventListener("click", e => {
+  const hit = e.target.closest("[data-id]");
+  if (hit) openWords(hit.dataset.id, null);
+});
+
+/* ---- Word cloud overlay ------------------------------------------------------------------- */
+let overlayReturn = null;
+function openWords(smellId, returnTo) {
+  const smell = SMELL_BY_ID.get(smellId);
+  if (!smell) return;
+  const n = resultDocs().filter(d => d.smellId === smellId).length;
+  const { entries, total } = wordData(smellId);
+  $("ovDot").innerHTML = nrDot(smell);
+  $("ovTitle").textContent = smell.label;
+  $("ovMeta").innerHTML = n
+    ? `<b class="num">${n}</b>× geroken · <b class="num">${total}</b> ${total === 1 ? "woord" : "woorden"}${entries.some(e => e.mine) ? " · jouw woorden zijn onderstreept" : ""}`
+    : "Nog niet geroken";
+  overlayReturn = returnTo || document.activeElement;
+  $("overlay").hidden = false;
+  $("overlay").querySelector(".icon-btn").focus({ preventScroll: true });
+  const draw = () => layoutWordCloud($("wordcloud"), entries);
+  draw();
+  document.fonts?.ready.then(() => { if (!$("overlay").hidden) draw(); });
+}
+function closeWords() {
+  if ($("overlay").hidden) return;
+  $("overlay").hidden = true;
+  overlayReturn?.focus?.({ preventScroll: true });
+}
+$("overlay").addEventListener("click", e => { if (e.target.closest("[data-close]")) closeWords(); });
+addEventListener("keydown", e => { if (e.key === "Escape") closeWords(); });
+
+/* Spiral placement: biggest word in the middle, every next word walks out
+   along an elliptical spiral until it finds a free spot. The start angle is
+   derived from the word itself, so a redraw puts words back where they were. */
+function wordAngle(text) {
+  let h = 2166136261;
+  for (const ch of text) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) / 4294967296) * Math.PI * 2;
+}
+function layoutWordCloud(host, entries) {
+  host.replaceChildren();
+  if (!entries.length) {
+    host.innerHTML = '<p class="wordcloud__empty">Nog geen woorden bij deze geur.</p>';
+    return;
+  }
+  const W = host.clientWidth, H = host.clientHeight;
+  if (!W || !H) return;
+  const max = entries[0].count, min = entries[entries.length - 1].count;
+  const base = Math.min(W * 0.75, H);
+  const fMax = Math.min(base * 0.19, 84), fMin = Math.max(base * 0.06, 16);
+  const placed = [];
+  const free = b => b.x >= 0 && b.y >= 0 && b.x + b.w <= W && b.y + b.h <= H &&
+    !placed.some(p => b.x < p.x + p.w && b.x + b.w > p.x && b.y < p.y + p.h && b.y + b.h > p.y);
+  entries.forEach((e, rank) => {
+    const r = max === min ? 0.35 : (e.count - min) / (max - min);
+    let size = fMin + (fMax - fMin) * Math.sqrt(r);
+    const weight = r >= 0.5 ? 700 : r >= 0.2 ? 600 : 500;
+    const a0 = wordAngle(e.text);
+    for (let attempt = 0; attempt < 4; attempt++, size *= 0.82) {
+      const w = textWidth(e.text, `${weight} ${size}px ${FONT_BASE}`) + size * 0.4;
+      const h = size * 1.24;
+      let spot = null;
+      for (let i = 0; i < 3200 && !spot; i++) {
+        const t = i * 0.1, rad = 1.3 * t;
+        const b = { x: W / 2 + rad * 1.6 * Math.cos(t + a0) - w / 2, y: H / 2 + rad * Math.sin(t + a0) - h / 2, w, h };
+        if (free(b)) spot = b;
+      }
+      if (!spot) continue;
+      placed.push(spot);
+      const span = document.createElement("span");
+      span.textContent = e.text;
+      span.style.cssText = `font-size:${size.toFixed(1)}px;font-weight:${weight};transform:translate(${(spot.x + size * 0.2).toFixed(1)}px,${(spot.y + size * 0.09).toFixed(1)}px);opacity:${e.mine ? 1 : (0.62 + 0.38 * Math.sqrt(r)).toFixed(2)}`;
+      span.className = [rank < 3 && r >= 0.5 ? "is-top" : "", e.mine ? "is-mine" : ""].join(" ").trim();
+      host.appendChild(span);
+      break;
+    }
+  });
+}
+
+/* ---- Export -------------------------------------------------------------------------------- */
+function toIso(ts) {
+  if (!ts) return "";
+  const d = typeof ts.toDate === "function" ? ts.toDate() : ts instanceof Date ? ts : new Date(ts);
+  return isNaN(d) ? "" : d.toISOString();
+}
+function csvCell(value) {
+  const s = value == null ? "" : String(value);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+$("exportBtn").addEventListener("click", async () => {
+  const msg = t => ($("exportMsg").textContent = t);
+  if (!store) { msg("Nog geen verbinding met de database."); return; }
+  msg("Bezig met ophalen…");
+  try {
+    const docs = await withTimeout(store.fetchAll(), 20000);
+    docs.sort((a, b) => toIso(a.timestamp).localeCompare(toIso(b.timestamp)));
+    const rows = [["sessionId", "position", "smellId", "smellLabel", "valence", "arousal", "words", "timestamp"]];
+    for (const d of docs) {
+      rows.push([
+        d.sessionId ?? "", d.position ?? "", d.smellId ?? "", SMELL_BY_ID.get(String(d.smellId))?.label ?? "",
+        d.valence ?? "", d.arousal ?? "", Array.isArray(d.words) ? d.words.join(" | ") : "", toIso(d.timestamp),
+      ]);
+    }
+    const csv = rows.map(r => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const now = new Date(), two = n => String(n).padStart(2, "0");
+    const stamp = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}`;
+    const a = Object.assign(document.createElement("a"), { href: url, download: `geur-antwoorden-${stamp}.csv` });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    msg(`${docs.length} antwoorden geëxporteerd.`);
+  } catch (err) {
+    console.error("Export mislukt:", err);
+    msg("Exporteren lukte niet. Probeer het zo opnieuw.");
+  }
+});
+
+/* ---- Helpers + boot ------------------------------------------------------------------------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function showNotice(title, html, retry) {
+  $("noticeTitle").textContent = title;
+  $("noticeBody").innerHTML = html;
+  $("noticeBtn").hidden = !retry;
+  $("noticeBtn").onclick = retry || null;
+  $("notice").hidden = false;
+}
+function onData(docs) {
+  allDocs = docs;
+  if (state.screen === "reveal") renderRevealPlot();
+  if (state.screen === "end") renderEnd();
+}
+
+async function boot() {
+  resetCurrent();
+  go("intro");
+
+  if (DEMO) {
+    store = createDemoStore();
+    $("demoBadge").hidden = false;
+  } else if (!isConfigured(firebaseConfig)) {
+    showNotice("Firebase is nog niet ingesteld",
+      `<p>Vul bovenaan <code>tablet.html</code> en <code>display.html</code> de <code>firebaseConfig</code> in.</p>
+       <p>Wil je eerst alleen kijken hoe het werkt? Zet <code>?demo</code> achter de URL.</p>`);
+    return;
+  } else {
+    try {
+      store = await createFirebaseStore();
+    } catch (err) {
+      console.error(err);
+      showNotice("Geen verbinding",
+        "<p>De database is niet bereikbaar. Heeft de iPad internet? Probeer het daarna opnieuw.</p>",
+        () => location.reload());
+      return;
+    }
+  }
+  // Small status line on the start screen, so whoever runs the stand can see
+  // the database is reachable before the next child arrives.
+  const showConn = () => {
+    $("connState").textContent = store.demo ? "" :
+      connection === "live" ? "Database verbonden ·" :
+      connection === "connecting" ? "Verbinden met database… ·" : "Geen verbinding met database ·";
+  };
+  const sub = store.subscribe(onData, kind => {
+    connection = kind;
+    showConn();
+    if (state.screen === "end") $("resultNote").hidden = kind === "live";
+  });
+  showConn();
+  setTimeout(() => { if (connection === "connecting") { connection = "none"; showConn(); } }, 15000);
+  addEventListener("online", () => sub.retryNow());
+}
+boot();
+</script>
+</body>
+</html>

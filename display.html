@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<script>
+/* =====================================================================
+   CONFIGURATIE — HIER AANPASSEN
+   Houd SMELLS en firebaseConfig precies gelijk in display.html en
+   tablet.html.
+   ===================================================================== */
+
+/* ---- 1. GEUREN (12) ---------------------------------------------------
+   nr     het nummer op het potje. Wordt opgeslagen als smellId ("1" t/m
+          "12"); verander een nummer niet meer zodra er data is.
+   label  de naam die het kind pas NA het raten te zien krijgt. Mag je
+          altijd aanpassen. (Hieronder staan voorbeelden: vervang ze door
+          jullie eigen geuren.)
+   Elke geur krijgt automatisch een vaste kleur op basis van zijn nummer.
+   Wil je er één zelf kiezen, voeg dan  color: "#RRGGBB"  toe.          */
+const SMELLS = [
+  { nr: 1,  label: "Kaneel" },
+  { nr: 2,  label: "Vers gemaaid gras" },
+  { nr: 3,  label: "Zee" },
+  { nr: 4,  label: "Lavendel" },
+  { nr: 5,  label: "Aardbei" },
+  { nr: 6,  label: "Pepermunt" },
+  { nr: 7,  label: "Koffie" },
+  { nr: 8,  label: "Citroen" },
+  { nr: 9,  label: "Vanille" },
+  { nr: 10, label: "Chocolade" },
+  { nr: 11, label: "Sinaasappel" },
+  { nr: 12, label: "Roos" },
+];
+
+/* ---- 2. FIREBASE ------------------------------------------------------
+   Firebase console → Project settings → General → Your apps → Web app
+   → "SDK setup and configuration" → Config. Plak de waarden hieronder.
+   Tip: open deze pagina met ?demo achter de URL om zonder Firebase te
+   testen met voorbeelddata (?demo=reset begint die opnieuw).          */
+const firebaseConfig = {
+  apiKey:            "AIzaSyDl3N8YRdvxTfp91x9Ngmr7EW_3fVbPY7Y",
+  authDomain:        "aeml-geur-experiment.firebaseapp.com",
+  projectId:         "aeml-geur-experiment",
+  storageBucket:     "aeml-geur-experiment.firebasestorage.app",
+  messagingSenderId: "73583670854",
+  appId:             "1:73583670854:web:71d71a459e2f183b453c47",
+};
+/* ======================= einde configuratie ======================== */
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geur en geheugen · groot scherm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..700&family=Archivo:wdth,wght@62..125,400..700&display=swap">
+<style>
+:root {
+  --navy:      #07162C;
+  --blue-dark: #1C345B;
+  --blue-mid:  #4672A2;
+  --red:       #B02A3C;
+  --blush:     #F7E8E4;
+  --white:     #FFFFFF;
+
+  /* Twelve smell colours. 1–5 are the lab's own data colours; 6–12 extend
+     them at the same muted, editorial value. Picked for the widest possible
+     separation, but twelve hues cannot all be told apart, so the tablet puts
+     the number in every dot; this screen is deliberately colour only. */
+  --smell-1:  #B02A3C;
+  --smell-2:  #4672A2;
+  --smell-3:  #C98A2B;
+  --smell-4:  #5B8C6B;
+  --smell-5:  #6B4C6E;
+  --smell-6:  #3E9AA6;
+  --smell-7:  #E0876B;
+  --smell-8:  #1E4D6B;
+  --smell-9:  #8C8B2E;
+  --smell-10: #C4799F;
+  --smell-11: #8FB2D6;
+  --smell-12: #A48BD0;
+
+  --font-base:    'DM Sans', system-ui, sans-serif;
+  --font-display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --radius: 4px;
+
+  --dur-fast:    140ms;
+  --dur-base:    260ms;
+  --dur-slow:    520ms;
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-inout:  cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Everything on this screen sits on navy, so the ring is blush. */
+  --focus-ring: var(--blush);
+  --gutter: clamp(20px, 3.2vw, 72px);
+  --band-h: clamp(96px, 15vh, 220px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--navy);
+  color: var(--blush);
+  font-family: var(--font-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.display-face {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-stretch: 106%;
+  letter-spacing: -0.018em;
+}
+
+/* ---- Stage ---------------------------------------------------------- */
+.stage {
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 680px);
+  grid-template-rows: minmax(0, 1fr) var(--band-h);
+  column-gap: var(--gutter);
+  padding: var(--gutter) var(--gutter) 0;
+}
+
+/* ---- Plot column ------------------------------------------------------ */
+.plot-col {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.6vh, 28px);
+}
+.plot-box {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.plot-box > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.plot-caption {
+  max-width: 60ch;
+  margin: 0 auto;
+  text-align: center;
+  font-size: clamp(0.95rem, 1.08vw, 1.5rem);
+  line-height: 1.5;
+  color: rgba(247, 232, 228, 0.72);
+}
+
+/* ---- VA plot (shared look with the tablet) ----------------------------- */
+.va-plot { color: var(--navy); font-family: var(--font-base); }
+.va-pill { fill: var(--blush); }
+.va-grid line {
+  stroke: var(--navy);
+  stroke-opacity: 0.1;
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+.va-grid .is-edge { stroke-opacity: 0.2; }
+.va-grid .is-zero { stroke-opacity: 0.34; stroke-width: 1.5px; }
+.va-face { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.va-axis-label { fill: currentColor; font-weight: 600; font-size: 36px; }
+.va-empty { fill: var(--navy); fill-opacity: 0.5; font-size: 38px; font-weight: 500; text-anchor: middle; }
+.va-empty .va-empty__big { font-family: var(--font-display); font-weight: 700; font-stretch: 106%; letter-spacing: -0.018em; font-size: 46px; fill-opacity: 0.7; }
+.cloud__body { vector-effect: non-scaling-stroke; }
+.marker__ring { fill: none; stroke: var(--blush); stroke-width: 5px; vector-effect: non-scaling-stroke; }
+.marker__fill { stroke: var(--navy); stroke-opacity: 0.35; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+
+/* ---- Aside: explainer card + tally ---------------------------------------- */
+.aside {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(16px, 3vh, 48px);
+}
+.card {
+  background: var(--blue-dark);
+  color: var(--white);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+  padding: clamp(1.5rem, 2.1vw, 3.25rem) clamp(1.5rem, 2vw, 3rem);
+}
+.card__title {
+  color: var(--blush);
+  font-size: clamp(1.35rem, 1.8vw, 2.6rem);
+  line-height: 1.16;
+  margin-bottom: 0.85em;
+  text-wrap: balance;
+}
+.card p {
+  font-size: clamp(0.98rem, 1.1vw, 1.6rem);
+  line-height: 1.62;
+  color: rgba(247, 232, 228, 0.82);
+}
+.card p + p { margin-top: 0.75em; }
+.card strong { font-weight: 600; color: var(--blush); }
+
+.tally { display: flex; align-items: baseline; gap: 0.55em; padding-left: 3px; }
+.tally__num {
+  font-size: clamp(2.4rem, 4vw, 6rem);
+  line-height: 1;
+  letter-spacing: -0.028em;
+  color: var(--blush);
+  font-variant-numeric: tabular-nums;
+}
+.tally__label { font-size: clamp(1rem, 1.2vw, 1.7rem); color: rgba(247, 232, 228, 0.72); }
+
+/* ---- River band: brand + drifting words ------------------------------------- */
+.river {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  position: relative;
+  margin: 0 calc(-1 * var(--gutter));
+  overflow: hidden;
+}
+.river__line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.river__line path {
+  fill: none;
+  stroke: var(--blush);
+  stroke-opacity: 0.2;
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+}
+/* Same move as the site's nav: a blush arch behind just the icon, flush with
+   the screen edge and rounded into a semicircle; the wordmark sits outside it
+   on navy. */
+.brand {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 1.4vw, 32px);
+  z-index: 1;
+}
+.brand__panel {
+  height: clamp(56px, 8.5vh, 120px);
+  display: flex;
+  align-items: center;
+  padding: 0 clamp(18px, 1.5vw, 34px) 0 var(--gutter);
+  background: var(--blush);
+  border-radius: 0 999px 999px 0;
+  box-shadow: 10px 0 26px -6px rgba(6, 18, 31, 0.35);
+}
+.brand__mark { height: 74%; width: auto; display: block; }
+.brand__text {
+  font-weight: 700;
+  font-size: clamp(0.9rem, 1.05vw, 1.45rem);
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  color: var(--blush);
+}
+.river__words { position: absolute; inset: 0; pointer-events: none; }
+.drift-word {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--blush);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* ---- Status + notices ------------------------------------------------------ */
+.status {
+  position: fixed;
+  top: calc(var(--gutter) / 2);
+  right: var(--gutter);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-size: clamp(0.85rem, 0.9vw, 1.2rem);
+  color: rgba(247, 232, 228, 0.8);
+  z-index: 5;
+}
+.status svg { width: 1.3em; height: 1.3em; flex: none; }
+.status button {
+  font: inherit;
+  font-weight: 600;
+  color: var(--blush);
+  background: none;
+  border: 1px solid rgba(247, 232, 228, 0.35);
+  border-radius: 999px;
+  padding: 0.25em 0.9em;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.status button:hover { border-color: var(--blush); }
+.status button:active { transform: scale(0.94); }
+.demo-badge {
+  position: fixed;
+  top: calc(var(--gutter) / 2);
+  left: var(--gutter);
+  transform: translateY(-50%);
+  font-size: clamp(0.8rem, 0.85vw, 1.1rem);
+  font-weight: 600;
+  color: var(--blush);
+  border: 1px solid rgba(247, 232, 228, 0.35);
+  border-radius: 999px;
+  padding: 0.2em 0.9em;
+}
+.notice {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(7, 22, 44, 0.9);
+  z-index: 10;
+  padding: var(--gutter);
+}
+.notice .card { max-width: 40rem; }
+.notice .card p { color: rgba(247, 232, 228, 0.85); }
+.notice code { font-size: 0.92em; color: var(--blush); }
+
+.icon { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- AEML-beeldmerk (huisje/rivier) uit reference/aeml-logo.svg -->
+    <g id="aeml-mark">
+      <path fill="#07162c" d="M283.2,12.32l-.15.92-7.29-2.8c-.86-.33-1.49-1.13-1.43-1.88.16-1.99,2.19-1.9,2.73-3.29l-6.11,1.75c-1.35.39-4.45,2.38-2.93,2.72l7.42,2.51c1.26.43,2.14,1.33,2.05,2.5-.07,1.04-.71,1.84-1.85,2.29l-4.47,1.76.03-1.01c1.72-.94,5.58-2.07,5.36-3.25-.07-3.55-10.08-2.18-9.8-5.33.14-1.63,2.45-2.8,3.99-3.24l19.84-5.63c-4.36,3.39-14.58,5.94-15.24,7.74-.15.42.08,1.12.58,1.32l7.28,2.91Z"/>
+      <path fill="#07162c" d="M142.35,320.32c-.51-.5-.02-.52.2-.77-.01.59.39.72.61.62,8.29,12.16,13.94,27.02,13,42.17-1.07-8.46-1.24-16.68-4.73-24.43l-4.94-10.95-3.77-6.28c-.12-.21-.34-.35-.39-.36Z"/>
+      <path fill="#07162c" d="M221.47,182.89c3.02-5.38,2.78-11.26-.99-16.59,4.99,4.02,5.86,11.95.99,16.59Z"/>
+      <path fill="#07162c" d="M73.36,257.36c-2.78-4.62-2.71-10.62.14-15.37-1.33,5.17-1.4,9.83-.14,15.37Z"/>
+      <path fill="#07162c" d="M284.3,13.06c-.31,0-.55-.21-.59-.51l.59.51Z"/>
+      <path fill="#fefeff" d="M193.39,161.53c4.76,3.05,10.09,6.74,8.46,11.74-1.32,4.04-10.15,6.38-15.78,8.48v-24.92s7.33,4.7,7.33,4.7Z"/>
+      <path fill="#fefeff" d="M180.15,115.49c-1.84-1.87-4.47-1.85-6.54-.11-.52-1.17-.43-2.42-.19-3.86,3.37-1.66,7.2-.65,9.65,2.27,2.62,3.12,2.7,7.49.46,10.95-1.31-.29-2.2-.83-2.93-1.67,1.65-2.35,1.67-5.43-.45-7.58Z"/>
+      <path fill="#fefeff" d="M179.07,122.24l-4.17-4.24c-.6-.61.15-1.51.55-1.8.53-.39,1.32-.69,2.15-.39,1.22.44,2.07,1.51,2.3,2.35.41,1.45.23,2.83-.82,4.08Z"/>
+      <path fill="#07162c" d="M271.21,17.8l-.03,1.01-9.8,4.11-26.07,7.55c-5.94,1.72-16.6,6.51-16.22,10.64.3,3.34,5.18,4.86,9.04,6.49l4.39,1.86,16.69,5.28c5.25,1.66,12.79,3.94,12.49,8.02-.22,2.96-5.78,5.68-9.58,6.66-14.86,3.82-29.54,6.9-44.66,9.96-13.13,2.66-26.06,4.51-38.71,8.79l-8.66,2.93c-8.48,2.87-18.86,5.83-25.27,12.13-2.67,2.62-4.87,5.78-4.92,9.77-.08,6.3,6.14,11.62,11.25,15.89s11.25,7.62,17.41,10.86l26.41,13.9,13.19,8.84c2.12,1.42,3.75,3.42,4.94,5.65,1.75,3.26.8,7.1-2.42,9.23-3.71,2.45-7.79,4.83-12.27,5.82l-15.76,3.48-59.03,8.64-26.31,4.96c-18.59,3.5-36.27,10.08-52.41,19.9l-8.76,6.67c-6.38,4.86-11.54,10.53-15.69,17.43-3.45,5.74-6.12,12-5.84,18.98s3.02,13.99,7.95,18.64l7.44,7.03,22.56,16.78,7.74,7.63c6.27,7.35,10.26,16.34,10.08,26.09-.26,14.2-9.82,27.06-19.26,37.33-8.43,9.17-18.19,16.53-28.01,24.33l-10.82-.11-.02-262.95c-.63-.92-1.36-1.07-2.03-1.63-.43-2.02-.21-3.72.44-5.65,1.18,0,2.05.17,3.19-.19.47-.81,1.15-2.57.47-3.45-3.3-4.21-3.74-10.03-.51-14.24,2.09-2.73,4.85-3.92,8.07-3.81,3.05.11,5.72,1.51,7.5,4.78,7.12-5.5,10.52-14.06,9.07-23.01-2.47-1.73-3.16-4.51-2.62-7.8,11.53-.47,21.82-6.6,28.16-16.54,12.12-19.01,3.17-40.55,24.31-50.17l.06-10.33-2.7-.34V0s37.03,0,37.03,0v5.63s-2.71.34-2.71.34l.07,10.34c20.4,9.34,12.74,29.45,23.04,48.06,6.11,11.05,16.99,18.18,29.53,18.65l-.3,4.94c11.43-3.18,22.51-5.66,34.13-8.09l50.26-10.51c4.77-1,13.13-3.87,13.56-6.15.58-3.08-4.37-4.86-8.51-6.19l-23.94-7.7c-3.77-1.21-9.95-4.63-10.31-8.14-.17-1.61.77-2.58,1.73-3.76,4.02-4.93,11.5-7.02,18-8.89l17.5-5.03,13.55-4.67c1.09-.38,2.01-.51,2.94-1.02ZM111.13,1.35l-3.55-.26-26.83.05-3.56.25c-.2,1.1-.23,2.1.09,3.08,11.43-1.14,22.34-1.16,33.8,0,.25-.97.26-1.97.05-3.12ZM66.82,41.99c1.12-10.11,5.96-19.35,16.03-22.02l.03-13.34h22.56s0,13.26,0,13.26c10.19,2.87,14.97,11.92,16.13,22.51,2.34,21.36,12.37,40.14,34.38,44.77l-.61,3.3c3.38-.2,6.65-3.63,5.46-5.93-17.71-1.2-30.84-15.51-34.18-32.46l-3.3-16.79c-1.63-8.26-6.95-14.64-14.78-17.8V5.5s-28.73,0-28.73,0v12c-7.99,3.21-13.24,9.78-14.88,18.19l-3.21,16.41c-3.3,16.86-16.49,31.33-34.23,32.44-.65,1.74.13,3.38,1.94,4.16,3,10.43-1.34,22.1-10.87,27.52-1.27-3.18-3.3-5.11-5.9-5.44-2.78-.35-5.27.61-7.16,2.74-2.29,2.59-2.91,5.92-1.64,9.31.98,2.61,3.54,5.68,6.86,5.77l7.14.18-.27-6.12c-2.76,3.42-6.87,3.59-9.34,1.02-2.62-2.74-2.23-7.25,1.17-9.11,1.81-.99,4.18-.56,5.25,1.01.33.49.2.97.13,1.23-.42,1.5-1.87-.98-2.94-1.1-.86-.09-1.7.2-2.38.83-1.44,1.34-1.62,3.29-.66,5.08.81,1.51,2.28,2.18,4.16,2.16,1.98-.02,2.61-2.31,3.97-3.09,4.26-2.41,8.25-4.46,11.23-8.57,5.3-7.31,6.61-16.23,4.19-24.98,22.66-4.81,32.11-24.01,34.46-45.18ZM1.94,135.27c2.43,1.46,4.7-.15,5.89-2.1.69-1.12,1.18-2.17.47-3.22-.4-.6-1.8-1.59-2.57-.78-.32.54.41,2.12-.58,2.86-.55.42-2.12.04-3.01.33-.68.22-.91,2.48-.2,2.9ZM193.39,161.53l-7.32-4.7v24.92c5.63-2.1,14.46-4.44,15.78-8.48,1.64-5-3.7-8.69-8.46-11.74Z"/>
+      <path fill="#07162c" d="M284.28,13.03c.79.69,1.16,1.64.97,2.71-.52,2.9-7.9,6.55-11.99,7.92l-28.78,9.69c-1.62.55-6.71,3.95-6.33,6.27.45,2.8,5.48,4.76,9.35,5.84,4.22,1.17,8.08,2.73,12.24,4.05l14.25,4.51c2.3.73,4.31,1.95,6.29,3.29,2.51,1.69,4.2,4.28,3.84,7.34-.28,2.4-1.94,5.05-4.48,6.35-4.58,2.36-9.18,4.48-14.34,5.8l-45.78,11.71-16.26,4.95c-9.78,2.98-23,7.34-29.15,15.79,4.19-.68,7.7.17,10.2,3.29,3.06,3.81,3.12,8.92.62,13.36l6.34,3.65,27.08,11.24,20.23,8.16c8.59,3.47,16.58,7.7,23.59,13.77,2.72,2.35,4.9,5.37,6.16,8.59,3.09,7.89-.63,15.3-7.16,19.94-4.69,3.33-8.61,7.29-14.19,9.28l-18.39,6.55c-8.44,3.01-16.61,5.39-25.41,7.22l-17.13,3.57-.02,183.16-8.6.02,2.18-10.23c5.6-26.32-1.44-56.81-19.97-76.47l-6.08-6.45c-4.5-4.78-8.7-9.37-13.94-13.43l-21.32-16.54-4.68-4.5c-3.32-3.19-6.79-6.6-8.72-10.75-3.65-7.84-1.47-16.39,4.79-21.87,5.44-4.77,11.11-8.35,18.1-10.28l29.99-8.3,18.83-4.27,34.82-7.71c2.56-.57,4.65-1.4,7.12-2.1,10.31-2.95,20.46-5.89,30.05-10.78l9.11-5.76c6.66-4.21,11.74-11.34,9.01-18.95-1.99-5.56-6.1-9.51-11.12-12.44l-11.83-6.9-46.26-18.91c-8.13-3.32-19.33-9.02-24.22-15.66-2.61-3.54-2.48-8.39.24-11.83,2.53-3.21,5.65-5.6,9.3-7.48,11.68-6.01,29.81-11.25,43.09-14.58l38.7-9.69,6.65-2.51c2.94-1.11,6.07-1.94,8.61-3.8,1.97-1.45,2.99-4.05,2.54-6.12-.49-2.24-1.96-3.92-4.07-5-5.82-3.01-11.89-4.9-18.22-6.67-3.97-1.11-7.59-2.46-11.42-3.88-4.25-1.58-11.83-3.72-11.94-7.54-.11-4.03,5.57-7.39,9.91-8.81l20.19-6.61c3.3-1.08,6.31-1.95,9.36-3.67,2.59-1.47,8.16-2.82,7.79-5.7-.07-.55-.48-1.19-.97-1.62l.15-.92c.15.06.32.13.51.23.03.29.27.49.56.49ZM180.15,115.49c2.12,2.16,2.1,5.23.45,7.58.73.84,1.62,1.38,2.93,1.67,2.23-3.46,2.15-7.83-.46-10.95-2.45-2.92-6.28-3.94-9.65-2.27-.23,1.45-.32,2.69.19,3.86,2.06-1.75,4.7-1.76,6.54.11ZM179.07,122.24c1.06-1.24,1.23-2.63.82-4.08-.24-.84-1.08-1.91-2.3-2.35-.83-.3-1.62,0-2.15.39-.4.29-1.15,1.19-.55,1.8l4.17,4.24Z"/>
+      <path fill="#fff" d="M66.82,41.99c-2.35,21.17-11.8,40.37-34.46,45.18,2.42,8.75,1.12,17.67-4.19,24.98-2.98,4.11-6.97,6.15-11.23,8.57-1.36.77-2,3.07-3.97,3.09-1.88.02-3.35-.66-4.16-2.16-.96-1.79-.78-3.74.66-5.08.67-.63,1.52-.92,2.38-.83,1.06.11,2.52,2.6,2.94,1.1.07-.26.21-.74-.13-1.23-1.06-1.57-3.44-2-5.25-1.01-3.4,1.86-3.8,6.37-1.17,9.11,2.46,2.57,6.58,2.4,9.34-1.02l.27,6.12-7.14-.18c-3.32-.08-5.88-3.16-6.86-5.77-1.27-3.39-.65-6.72,1.64-9.31,1.89-2.14,4.38-3.1,7.16-2.74,2.6.33,4.63,2.25,5.9,5.44,9.53-5.42,13.87-17.09,10.87-27.52-1.81-.79-2.59-2.42-1.94-4.16,17.74-1.11,30.93-15.58,34.23-32.44l3.21-16.41c1.64-8.41,6.9-14.98,14.89-18.19V5.5s28.73,0,28.73,0v12c7.83,3.16,13.16,9.54,14.78,17.8l3.3,16.79c3.34,16.95,16.47,31.26,34.18,32.46,1.19,2.31-2.08,5.73-5.46,5.93l.61-3.3c-22.02-4.63-32.05-23.4-34.38-44.77-1.16-10.59-5.93-19.65-16.13-22.51V6.64s-22.55,0-22.55,0l-.03,13.34c-10.07,2.67-14.91,11.91-16.03,22.02Z"/>
+      <path fill="#fff" d="M111.13,1.35c.21,1.15.2,2.15-.05,3.12-11.46-1.17-22.37-1.15-33.8,0-.32-.98-.29-1.98-.09-3.08l3.56-.25,26.83-.05,3.55.26Z"/>
+      <path fill="#fff" d="M1.94,135.27c-.71-.42-.48-2.68.2-2.9.89-.29,2.46.09,3.01-.33.99-.74.26-2.32.58-2.86.78-.81,2.17.18,2.57.78.71,1.05.21,2.09-.47,3.22-1.2,1.95-3.46,3.55-5.89,2.1Z"/>
+    </g>
+    <symbol id="i-offline" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5.2 13a9.6 9.6 0 0 1 4-2.4"/><path d="M14.6 10.6a9.6 9.6 0 0 1 4.2 2.4"/><path d="M2 9.4a14.4 14.4 0 0 1 4.4-2.8"/><path d="M10.4 5.3A14.4 14.4 0 0 1 22 9.4"/><path d="M12 20h.01"/></symbol>
+  </defs>
+</svg>
+
+<div class="stage">
+  <section class="plot-col" aria-label="Hoe voelden de geuren?">
+    <div class="plot-box" id="plotBox"></div>
+    <p class="plot-caption">Elke kleur is één geur: de stip in het midden is het gemiddelde, de wolk eromheen laat zien hoe verschillend iedereen het vond. Welke geur is welke? Doe mee op de iPad.</p>
+  </section>
+
+  <aside class="aside">
+    <article class="card">
+      <h1 class="card__title display-face">Waarom roept een geur zo direct een herinnering op?</h1>
+      <p>Bij zien, horen en voelen gaat de prikkel eerst langs de <strong>thalamus</strong>, een soort schakelstation in de hersenen, voordat hij de hersenschors bereikt. Bij geur gebeurt dat niet: reukprikkels gaan rechtstreeks van de neus naar de <strong>reukcortex</strong>.</p>
+      <p>Dat gebied ligt vlak naast — en is sterk verbonden met — de <strong>hippocampus</strong> (belangrijk voor herinneringen) en de <strong>amygdala</strong> (belangrijk voor emoties). Daardoor kan een geur ineens een herinnering én het bijbehorende gevoel oproepen, vaak sneller en sterker dan een geluid of beeld zou doen.</p>
+    </article>
+    <p class="tally" id="tally" hidden><span class="tally__num display-face" id="tallyNum">0</span><span class="tally__label" id="tallyLabel">antwoorden tot nu toe</span></p>
+  </aside>
+
+  <div class="river" id="river" aria-hidden="true">
+    <svg class="river__line" id="riverLine"><path d=""/></svg>
+    <div class="brand" id="brand">
+      <div class="brand__panel">
+        <svg class="brand__mark" viewBox="0 0 291 402" role="img" aria-label="AEML"><use href="#aeml-mark"/></svg>
+      </div>
+      <span class="brand__text">Amsterdam Emotional<br>Memory Lab</span>
+    </div>
+    <div class="river__words" id="riverWords"></div>
+  </div>
+</div>
+
+<div class="status" id="status" role="status" hidden>
+  <svg class="icon" aria-hidden="true"><use href="#i-offline"/></svg>
+  <span id="statusText"></span>
+  <button type="button" id="statusRetry" hidden>Nu opnieuw</button>
+</div>
+<div class="demo-badge" id="demoBadge" hidden>Demo-modus: voorbeelddata</div>
+
+<div class="notice" id="notice" hidden>
+  <div class="card" role="alert">
+    <h2 class="card__title display-face" id="noticeTitle"></h2>
+    <div id="noticeBody"></div>
+  </div>
+</div>
+
+<script type="module">
+/* =====================================================================
+   Geen aanpassingen nodig onder deze lijn.
+   ===================================================================== */
+const FIREBASE_SDK = "12.19.0";
+
+/* Motion mirrors the CSS tokens. The two ambient loops the brief asks for
+   (breathing clouds, drifting words) are far slower than any UI transition, so
+   they are expressed as multiples of --dur-slow instead of new numbers. */
+const MOTION = { fast: 140, base: 260, slow: 520 };
+const BREATHE_MS = MOTION.slow * 14;     // one breath ≈ 7.3 s
+const WORD_LIFE_MS = MOTION.slow * 34;   // a word is on screen ≈ 17.7 s
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+/* ---------------------------------------------------------------------
+   Shared: easing, smells, stats
+   --------------------------------------------------------------------- */
+function cubicBezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const X = t => ((ax * t + bx) * t + cx) * t;
+  const Y = t => ((ay * t + by) * t + cy) * t;
+  const dX = t => (3 * ax * t + 2 * bx) * t + cx;
+  return x => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const err = X(t) - x, d = dX(t);
+      if (Math.abs(err) < 1e-5 || Math.abs(d) < 1e-6) break;
+      t -= err / d;
+    }
+    let lo = 0, hi = 1;
+    if (t < 0 || t > 1 || Math.abs(X(t) - x) > 1e-3) {
+      t = x;
+      for (let i = 0; i < 24; i++) { X(t) < x ? (lo = t) : (hi = t); t = (lo + hi) / 2; }
+    }
+    return Y(t);
+  };
+}
+const easeOut = cubicBezier(0.22, 1, 0.36, 1);
+const easeInOut = cubicBezier(0.4, 0, 0.2, 1);
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const rootStyle = getComputedStyle(document.documentElement);
+
+const SMELL_LIST = SMELLS.slice(0, 12).map((s, i) => {
+  const nr = Number.isFinite(Number(s.nr)) ? Number(s.nr) : i + 1;
+  const slot = (((nr - 1) % 12) + 12) % 12 + 1;
+  return {
+    id: String(nr),
+    nr,
+    label: String(s.label ?? `Geur ${nr}`),
+    color: s.color || rootStyle.getPropertyValue(`--smell-${slot}`).trim(),
+  };
+}).sort((a, b) => a.nr - b.nr);
+if (SMELLS.length > 12) console.warn("SMELLS: alleen de eerste 12 geuren worden gebruikt.");
+if (new Set(SMELL_LIST.map(s => s.id)).size !== SMELL_LIST.length) console.warn("SMELLS: twee geuren hebben hetzelfde nummer.");
+const SMELL_BY_ID = new Map(SMELL_LIST.map(s => [s.id, s]));
+/* Every smell is drawn as the same unit circle, scaled to its spread. */
+const CIRCLE = "M1 0A1 1 0 1 1-1 0A1 1 0 1 1 1 0Z";
+
+function cleanDoc(raw) {
+  if (!raw || !SMELL_BY_ID.has(String(raw.smellId))) return null;
+  const v = Number(raw.valence), a = Number(raw.arousal);
+  if (!Number.isFinite(v) || !Number.isFinite(a)) return null;
+  const words = Array.isArray(raw.words)
+    ? raw.words.filter(w => typeof w === "string").map(w => w.trim()).filter(Boolean).slice(0, 3)
+    : [];
+  return { id: raw.id, smellId: String(raw.smellId), valence: clamp(v, -1, 1), arousal: clamp(a, -1, 1), words };
+}
+
+function computeStats(docs) {
+  const groups = new Map();
+  for (const d of docs) {
+    if (!groups.has(d.smellId)) groups.set(d.smellId, []);
+    groups.get(d.smellId).push(d);
+  }
+  const stats = new Map();
+  for (const [id, arr] of groups) {
+    const n = arr.length;
+    const mv = arr.reduce((s, d) => s + d.valence, 0) / n;
+    const ma = arr.reduce((s, d) => s + d.arousal, 0) / n;
+    const sd = (key, m) => n > 1 ? Math.sqrt(arr.reduce((s, d) => s + (d[key] - m) ** 2, 0) / (n - 1)) : 0;
+    stats.set(id, { n, mv, ma, sv: sd("valence", mv), sa: sd("arousal", ma) });
+  }
+  return stats;
+}
+
+/* ---------------------------------------------------------------------
+   Shared: the valence–arousal plot
+   One SVG in a 1400×1000 coordinate space. The blush pill is the frame;
+   the 800×800 data square sits in its straight middle, the x-axis labels
+   live in the round end caps, the y-axis labels in the strips above and
+   below the square.
+   --------------------------------------------------------------------- */
+const NS = "http://www.w3.org/2000/svg";
+const G = { W: 1400, H: 1000, X0: 300, Y0: 100, S: 800 };
+const UNIT = G.S / 2;
+const px = v => G.X0 + ((v + 1) / 2) * G.S;
+const py = a => G.Y0 + ((1 - a) / 2) * G.S;
+const MIN_SD = 0.07;
+
+function svgEl(name, attrs = {}, parent) {
+  const n = document.createElementNS(NS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+const FACES = {
+  unpleasant: '<circle cx="12" cy="12" r="9.5"/><path d="M9 9.2v1.6M15 9.2v1.6"/><path d="M8.4 16.6q3.6-3.2 7.2 0"/>',
+  pleasant:   '<circle cx="12" cy="12" r="9.5"/><path d="M9 9.2v1.6M15 9.2v1.6"/><path d="M8.2 14.2q3.8 3.8 7.6 0"/>',
+  calm:       '<circle cx="12" cy="12" r="9.5"/><path d="M7.6 10.6q1.4 1.2 2.8 0M13.6 10.6q1.4 1.2 2.8 0"/><path d="M10 15.6h4"/>',
+  aroused:    '<circle cx="12" cy="12" r="9.5"/><path d="M7.6 6.9q1.4-1 2.8 0M13.6 6.9q1.4-1 2.8 0"/><circle cx="9" cy="10.2" r="1.2"/><circle cx="15" cy="10.2" r="1.2"/><ellipse cx="12" cy="15.8" rx="1.9" ry="2.3"/>',
+};
+
+const measureCtx = document.createElement("canvas").getContext("2d");
+function textWidth(text, font) { measureCtx.font = font; return measureCtx.measureText(text).width; }
+
+function buildPlot(host, prefix) {
+  const svg = svgEl("svg", { viewBox: `0 0 ${G.W} ${G.H}`, class: "va-plot", "aria-hidden": "true" });
+  const defs = svgEl("defs", {}, svg);
+  const clip = svgEl("clipPath", { id: `${prefix}-clip` }, defs);
+  svgEl("rect", { width: G.W, height: G.H, rx: G.H / 2 }, clip);
+  const soft = svgEl("filter", { id: `${prefix}-soft`, x: "-60%", y: "-60%", width: "220%", height: "220%" }, defs);
+  svgEl("feGaussianBlur", { stdDeviation: 18 }, soft);
+
+  svgEl("rect", { class: "va-pill", width: G.W, height: G.H, rx: G.H / 2 }, svg);
+
+  const grid = svgEl("g", { class: "va-grid" }, svg);
+  for (const t of [-1, -0.5, 0, 0.5, 1]) {
+    const cls = t === 0 ? "is-zero" : Math.abs(t) === 1 ? "is-edge" : "";
+    svgEl("line", { x1: px(t), x2: px(t), y1: G.Y0, y2: G.Y0 + G.S, class: cls }, grid);
+    svgEl("line", { x1: G.X0, x2: G.X0 + G.S, y1: py(t), y2: py(t), class: cls }, grid);
+  }
+
+  const axes = svgEl("g", { class: "va-axes" }, svg);
+  const faces = {};
+  const face = (key, cx, cy, size) => {
+    const g = svgEl("g", { class: `va-face-wrap va-face-wrap--${key}` }, axes);
+    const inner = svgEl("g", { class: "va-face", transform: `translate(${cx - size / 2} ${cy - size / 2}) scale(${size / 24})` }, g);
+    inner.innerHTML = FACES[key];
+    faces[key] = g;
+    return g;
+  };
+  // x-axis: one face + word in each end cap
+  const capX = G.X0 / 2;
+  face("unpleasant", capX, 440, 88);
+  svgEl("text", { class: "va-axis-label", x: capX, y: 536, "text-anchor": "middle" }, faces.unpleasant).textContent = "onaangenaam";
+  face("pleasant", G.W - capX, 440, 88);
+  svgEl("text", { class: "va-axis-label", x: G.W - capX, y: 536, "text-anchor": "middle" }, faces.pleasant).textContent = "aangenaam";
+  // y-axis: face + word side by side in the strips above and below the square.
+  // Centring the pair needs the word's width, which changes once the webfont
+  // arrives, so it is measured again then.
+  const inline = [];
+  const addInline = (key, word, cy) => {
+    face(key, 0, cy, 56);
+    const text = svgEl("text", { class: "va-axis-label", y: cy + 12.5 }, faces[key]);
+    text.textContent = word;
+    inline.push({ key, word, cy, text });
+  };
+  const layoutInline = () => {
+    for (const { key, word, cy, text } of inline) {
+      const size = 56, gap = 14;
+      const w = textWidth(word, `600 36px ${getComputedStyle(document.body).fontFamily}`);
+      const x0 = G.W / 2 - (size + gap + w) / 2;
+      faces[key].firstElementChild.setAttribute("transform", `translate(${x0} ${cy - size / 2}) scale(${size / 24})`);
+      text.setAttribute("x", x0 + size + gap);
+    }
+  };
+  addInline("aroused", "opgewonden", G.Y0 / 2);
+  addInline("calm", "kalm", G.H - G.Y0 / 2);
+  layoutInline();
+  document.fonts?.ready.then(layoutInline);
+
+  const clouds = svgEl("g", { class: "va-clouds", "clip-path": `url(#${prefix}-clip)` }, svg);
+  const markers = svgEl("g", { class: "va-markers" }, svg);
+  const top = svgEl("g", { class: "va-top" }, svg);
+  host.appendChild(svg);
+  return { svg, clouds, markers, top, faces, filterId: `${prefix}-soft` };
+}
+
+/* ---------------------------------------------------------------------
+   Shared: data sources (Firebase, or ?demo for local testing)
+   --------------------------------------------------------------------- */
+const params = new URLSearchParams(location.search);
+const DEMO = params.has("demo");
+const isConfigured = cfg => !!cfg && typeof cfg.projectId === "string" && cfg.projectId.length > 0 && !/VUL-HIER-IN/i.test(JSON.stringify(cfg));
+
+async function createFirebaseStore() {
+  const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK}`;
+  const [{ initializeApp }, fs] = await Promise.all([
+    import(`${base}/firebase-app.js`),
+    import(`${base}/firebase-firestore.js`),
+  ]);
+  const app = initializeApp(firebaseConfig);
+  // Long-polling fallback keeps the connection alive on restrictive
+  // (eduroam-style) networks and proxies that break streaming.
+  const db = fs.initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+  const col = fs.collection(db, "responses");
+  const plain = d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) });
+  return {
+    demo: false,
+    subscribe(onData, onStatus) {
+      let unsub = null, timer = null, attempt = 0;
+      const start = () => {
+        clearTimeout(timer);
+        timer = null;
+        unsub = fs.onSnapshot(col, { includeMetadataChanges: true },
+          snap => {
+            attempt = 0;
+            onData(snap.docs.map(plain));
+            onStatus(snap.metadata.fromCache ? "cache" : "live");
+          },
+          err => {
+            unsub = null;
+            const wait = Math.min(30000, 3000 * 2 ** attempt++);
+            onStatus("error", { err, retryAt: Date.now() + wait });
+            timer = setTimeout(start, wait);
+          });
+      };
+      start();
+      return { retryNow() { if (!unsub) start(); } };
+    },
+    newId: () => fs.doc(col).id,
+    save: (id, data) => fs.setDoc(fs.doc(col, id), { ...data, timestamp: fs.serverTimestamp() }),
+    fetchAll: async () => (await fs.getDocs(col)).docs.map(plain),
+  };
+}
+
+function createDemoStore() {
+  const KEY = "geur-geheugen-demo-v2";
+  if (params.get("demo") === "reset") { try { localStorage.removeItem(KEY); } catch {} }
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } };
+  const write = l => { try { localStorage.setItem(KEY, JSON.stringify(l)); } catch {} };
+  let list = read();
+  if (!Array.isArray(list)) { list = seedDemo(); write(list); }
+  const listeners = new Set();
+  const snapshot = () => list.map(r => ({ ...r, timestamp: new Date(r.timestamp) }));
+  const emit = () => listeners.forEach(fn => fn(snapshot()));
+  // Other tabs in the same browser (display + tablet side by side) stay in sync.
+  addEventListener("storage", e => { if (e.key === KEY) { list = read() || []; emit(); } });
+  return {
+    demo: true,
+    subscribe(onData, onStatus) {
+      listeners.add(onData);
+      setTimeout(() => { onData(snapshot()); onStatus("live"); }, 150);
+      return { retryNow() {} };
+    },
+    newId: () => "demo-" + Math.random().toString(36).slice(2, 12),
+    async save(id, data) {
+      await new Promise(r => setTimeout(r, 400));
+      list = list.filter(r => r.id !== id).concat({ id, ...data, timestamp: new Date().toISOString() });
+      write(list);
+      emit();
+    },
+    fetchAll: async () => snapshot(),
+  };
+}
+
+function seedDemo() {
+  let s = 20260930;
+  const rand = () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const gauss = () => Math.sqrt(-2 * Math.log(rand() + 1e-9)) * Math.cos(2 * Math.PI * rand());
+  const pick = arr => arr[Math.floor(rand() * arr.length)];
+  const generic = ["oma", "vakantie", "zomer", "thuis", "school", "keuken", "tuin", "verjaardag", "bos", "regen", "opa", "camping", "zwembad", "winter", "fiets", "boerderij", "mama", "papa", "logeren", "feest"];
+  const themed = {
+    "kaneel": ["kerst", "appeltaart", "oma", "koekjes", "warm", "speculaas"],
+    "vers gemaaid gras": ["voetbal", "zomer", "tuin", "picknick", "buiten", "grasmaaier"],
+    "zee": ["strand", "vakantie", "zout", "golven", "zandkastelen", "schelpen"],
+    "lavendel": ["oma", "slapen", "kast", "Frankrijk", "rust", "zeep"],
+    "aardbei": ["snoep", "zomer", "ijsje", "taart", "kauwgom", "slagroom"],
+    "pepermunt": ["tandpasta", "kauwgom", "fris", "snoep", "winter", "koud"],
+    "koffie": ["papa", "ochtend", "mama", "bitter", "werk", "cafe"],
+    "citroen": ["zuur", "limonade", "zomer", "schoonmaken", "thee", "fris"],
+    "vanille": ["ijsje", "pudding", "taart", "zoet", "bakken", "vla"],
+    "chocolade": ["pasen", "sinterklaas", "lekker", "taart", "koekjes", "warme chocomel"],
+    "sinaasappel": ["sap", "ontbijt", "school", "fruit", "sinterklaas", "vitamine"],
+    "roos": ["tuin", "oma", "bloemen", "moederdag", "parfum", "bruiloft"],
+  };
+  const centres = new Map(SMELL_LIST.map(sm => [sm.id, { v: rand() * 1.4 - 0.6, a: rand() * 1.4 - 0.7, sp: 0.14 + rand() * 0.22 }]));
+  const out = [];
+  let t = Date.now() - 1000 * 60 * 60 * 3;
+  for (let k = 0; k < 24; k++) {
+    const sessionId = `demo-s-${k}`;
+    const order = SMELL_LIST.map(sm => sm.id).sort(() => rand() - 0.5).slice(0, 3 + Math.floor(rand() * 4));
+    order.forEach((smellId, i) => {
+      const c = centres.get(smellId);
+      const pool = themed[SMELL_BY_ID.get(smellId).label.toLowerCase()] || generic;
+      const words = [...new Set(Array.from({ length: 2 + Math.floor(rand() * 2) }, () => rand() < 0.7 ? pick(pool) : pick(generic)))];
+      out.push({
+        id: `demo-seed-${out.length}`,
+        smellId,
+        valence: +clamp(c.v + gauss() * c.sp, -1, 1).toFixed(3),
+        arousal: +clamp(c.a + gauss() * c.sp * 1.1, -1, 1).toFixed(3),
+        words,
+        sessionId,
+        position: i + 1,
+        timestamp: new Date((t += 30000 + rand() * 60000)).toISOString(),
+      });
+    });
+  }
+  return out;
+}
+
+/* =====================================================================
+   Display
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const plot = buildPlot($("plotBox"), "disp");
+const cloudState = new Map();   // smellId → { el, from, to, t0, phase }
+let wordPool = [];
+let everHadData = false;
+
+const emptyText = svgEl("text", { class: "va-empty", x: G.W / 2, y: G.H / 2 - 14 }, plot.top);
+const emptyBig = svgEl("tspan", { class: "va-empty__big", x: G.W / 2 }, emptyText);
+const emptySmall = svgEl("tspan", { x: G.W / 2, dy: 58 }, emptyText);
+function setEmpty(big, small) {
+  emptyText.style.display = big ? "" : "none";
+  emptyBig.textContent = big || "";
+  emptySmall.textContent = small || "";
+}
+setEmpty("Verbinden…", "");
+
+function createCloud(smell) {
+  const g = svgEl("g", { class: "cloud", opacity: 0 });
+  const haloWrap = svgEl("g", { filter: `url(#${plot.filterId})` }, g);
+  const halo = svgEl("path", { d: CIRCLE, fill: smell.color, "fill-opacity": 0.16 }, haloWrap);
+  const body = svgEl("path", {
+    d: CIRCLE, class: "cloud__body", fill: smell.color, "fill-opacity": 0.15,
+    stroke: smell.color, "stroke-opacity": 0.55, "stroke-width": 1.25,
+  }, g);
+  const core = svgEl("path", { d: CIRCLE, fill: smell.color, "fill-opacity": 0.16 }, g);
+
+  // Twelve smells share the plot, so the averages are small, quiet dots.
+  const m = svgEl("g", { class: "marker", opacity: 0 });
+  svgEl("circle", { class: "marker__ring", r: 9 }, m);
+  svgEl("circle", { class: "marker__fill", r: 9, fill: smell.color }, m);
+  plot.markers.appendChild(m);
+  return { g, halo, body, core, marker: m };
+}
+
+function applyStats(docs) {
+  const stats = computeStats(docs);
+  const now = performance.now();
+  for (const smell of SMELL_LIST) {
+    const st = stats.get(smell.id);
+    let c = cloudState.get(smell.id);
+    if (!st) {
+      if (c) { c.el.g.remove(); c.el.marker.remove(); cloudState.delete(smell.id); }
+      continue;
+    }
+    const to = {
+      cx: px(st.mv), cy: py(st.ma),
+      rx: Math.max(st.sv, MIN_SD) * UNIT, ry: Math.max(st.sa, MIN_SD) * UNIT,
+      op: 1,
+    };
+    if (!c) {
+      c = { el: createCloud(smell), cur: { ...to, rx: to.rx * 0.4, ry: to.ry * 0.4, op: 0 }, phase: Math.random() * Math.PI * 2 };
+      cloudState.set(smell.id, c);
+    }
+    c.from = { ...c.cur };
+    c.to = to;
+    c.t0 = now;
+    c.area = to.rx * to.ry;
+  }
+  // Larger clouds underneath, so a tight cloud is never hidden by a wide one.
+  [...cloudState.values()].sort((a, b) => b.area - a.area).forEach(c => plot.clouds.appendChild(c.el.g));
+}
+
+function renderClouds(now) {
+  const still = reducedMotion.matches;
+  for (const c of cloudState.values()) {
+    const p = still ? 1 : easeOut(clamp((now - c.t0) / MOTION.slow, 0, 1));
+    const cur = c.cur;
+    for (const key of ["cx", "cy", "rx", "ry", "op"]) cur[key] = c.from[key] + (c.to[key] - c.from[key]) * p;
+    const breath = still ? 1 : 1 + 0.05 * Math.sin((now / BREATHE_MS) * Math.PI * 2 + c.phase);
+    const rx = cur.rx * breath, ry = cur.ry * breath;
+    const { g, halo, body, core, marker } = c.el;
+    g.setAttribute("transform", `translate(${cur.cx.toFixed(2)} ${cur.cy.toFixed(2)})`);
+    g.setAttribute("opacity", cur.op.toFixed(3));
+    halo.setAttribute("transform", `scale(${(rx * 1.5).toFixed(2)} ${(ry * 1.5).toFixed(2)})`);
+    body.setAttribute("transform", `scale(${rx.toFixed(2)} ${ry.toFixed(2)})`);
+    core.setAttribute("transform", `scale(${(rx * 0.5).toFixed(2)} ${(ry * 0.5).toFixed(2)})`);
+    marker.setAttribute("transform", `translate(${cur.cx.toFixed(2)} ${cur.cy.toFixed(2)})`);
+    marker.setAttribute("opacity", cur.op.toFixed(3));
+  }
+}
+
+/* ---- Tally ---------------------------------------------------------------- */
+function renderTally(n) {
+  $("tally").hidden = n === 0;
+  $("tallyNum").textContent = n.toLocaleString("nl-NL");
+  $("tallyLabel").textContent = n === 1 ? "antwoord tot nu toe" : "antwoorden tot nu toe";
+}
+
+/* ---- River band: wavy line + drifting words --------------------------------- */
+const river = { w: 0, h: 0, start: 0, amp: 0, lambda: 1, phase: 0.6 };
+const riverY = x => river.h / 2 + river.amp * Math.sin((x / river.lambda) * Math.PI * 2 + river.phase);
+
+function layoutRiver() {
+  const box = $("river").getBoundingClientRect();
+  const brand = $("brand").getBoundingClientRect();
+  river.w = box.width;
+  river.h = box.height;
+  river.start = brand.right - box.left + Math.max(24, box.width * 0.02);
+  river.amp = box.height * 0.1;
+  river.lambda = Math.max(360, box.width * 0.27);
+  const svg = $("riverLine");
+  svg.setAttribute("viewBox", `0 0 ${river.w} ${river.h}`);
+  let d = "";
+  for (let x = river.start; x <= river.w + 8; x += 6) d += `${d ? "L" : "M"}${x.toFixed(1)} ${riverY(x).toFixed(1)}`;
+  svg.firstElementChild.setAttribute("d", d);
+}
+
+const drifting = [];
+function pickWord() {
+  if (!wordPool.length) return null;
+  const showing = new Set(drifting.map(w => w.key));
+  for (let i = 0; i < 12; i++) {
+    const w = wordPool[Math.floor(Math.random() * wordPool.length)];
+    if (!showing.has(w.toLowerCase())) return w;
+  }
+  return null;
+}
+function spawnWord() {
+  const text = document.hidden ? null : pickWord();
+  if (text && river.w > 0) {
+    const el = document.createElement("span");
+    el.className = "drift-word";
+    el.textContent = text.length > 42 ? text.slice(0, 41) + "…" : text;
+    el.style.fontSize = `${(1.7 + Math.random() * 0.55).toFixed(2)}vw`;
+    $("riverWords").appendChild(el);
+    const travel = river.w * 0.2;
+    const minX = river.start + travel + river.w * 0.06;
+    const maxX = river.w * 0.93;
+    // Two lanes, just above and just below the line; pick the emptier one and
+    // the spot furthest from anything already drifting in it.
+    const laneCount = [-1, 1].map(l => drifting.filter(w => w.lane === l).length);
+    const lane = laneCount[0] === laneCount[1] ? (Math.random() < 0.5 ? -1 : 1) : (laneCount[0] < laneCount[1] ? -1 : 1);
+    let best = minX + Math.random() * (maxX - minX), bestGap = -1;
+    for (let i = 0; i < 10; i++) {
+      const x = minX + Math.random() * Math.max(0, maxX - minX);
+      const gap = Math.min(Infinity, ...drifting.filter(w => w.lane === lane).map(w => Math.abs(w.x - x)));
+      if (gap > bestGap) { best = x; bestGap = gap; }
+    }
+    drifting.push({ el, key: text.toLowerCase(), lane, x0: best, x: best, travel, t0: performance.now() });
+  }
+  setTimeout(spawnWord, 4000 + Math.random() * 4000);
+}
+function renderWords(now) {
+  const still = reducedMotion.matches;
+  for (let i = drifting.length - 1; i >= 0; i--) {
+    const w = drifting[i];
+    const p = (now - w.t0) / WORD_LIFE_MS;
+    if (p >= 1) { w.el.remove(); drifting.splice(i, 1); continue; }
+    w.x = still ? w.x0 : w.x0 - w.travel * p;
+    const y = riverY(w.x) + w.lane * river.h * 0.26;
+    const op = p < 0.14 ? easeOut(p / 0.14) : p > 0.76 ? 1 - easeInOut((p - 0.76) / 0.24) : 1;
+    w.el.style.transform = `translate(${w.x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;
+    w.el.style.opacity = op.toFixed(3);
+  }
+}
+
+function frame(now) {
+  renderClouds(now);
+  renderWords(now);
+  requestAnimationFrame(frame);
+}
+
+/* ---- Connection status -------------------------------------------------------- */
+let statusTimer = null, countdown = null;
+function showStatus(text, retry) {
+  $("status").hidden = !text;
+  $("statusText").textContent = text || "";
+  $("statusRetry").hidden = !retry;
+}
+function onStatus(kind, info) {
+  clearTimeout(statusTimer);
+  clearInterval(countdown);
+  if (kind === "live") { showStatus(""); if (!everHadData) setEmpty("Nog geen antwoorden", "Doe mee op de iPad!"); return; }
+  if (kind === "cache") {
+    // Firestore reports cached data for a moment on every reconnect; only
+    // mention it when it lasts.
+    statusTimer = setTimeout(() => showStatus(everHadData
+      ? "Even geen verbinding. Je ziet de laatst bekende stand."
+      : "Even geen verbinding. We blijven het proberen."), 5000);
+    return;
+  }
+  if (kind === "error") {
+    console.error("Firestore:", info?.err);
+    const tick = () => {
+      const s = Math.max(0, Math.ceil((info.retryAt - Date.now()) / 1000));
+      showStatus(`Verbinding met de database verbroken. Opnieuw proberen over ${s} s.`, true);
+    };
+    tick();
+    countdown = setInterval(tick, 1000);
+  }
+}
+
+function showNotice(title, html) {
+  $("noticeTitle").textContent = title;
+  $("noticeBody").innerHTML = html;
+  $("notice").hidden = false;
+}
+
+/* ---- Boot ------------------------------------------------------------------ */
+let gotSnapshot = false;
+function onData(rawDocs) {
+  gotSnapshot = true;
+  const docs = rawDocs.map(cleanDoc).filter(Boolean);
+  everHadData = everHadData || docs.length > 0;
+  applyStats(docs);
+  renderTally(docs.length);
+  wordPool = docs.flatMap(d => d.words);
+  if (docs.length) setEmpty("");
+}
+
+async function boot() {
+  layoutRiver();
+  addEventListener("resize", layoutRiver);
+  document.fonts?.ready.then(layoutRiver);
+  requestAnimationFrame(frame);
+  setTimeout(spawnWord, 1500);
+
+  let store;
+  if (DEMO) {
+    store = createDemoStore();
+    $("demoBadge").hidden = false;
+  } else if (!isConfigured(firebaseConfig)) {
+    setEmpty("Nog niet ingesteld", "");
+    showNotice("Firebase is nog niet ingesteld",
+      `<p>Vul bovenaan <code>display.html</code> en <code>tablet.html</code> de <code>firebaseConfig</code> in.</p>
+       <p>Wil je eerst alleen kijken hoe het eruitziet? Zet <code>?demo</code> achter de URL.</p>`);
+    return;
+  } else {
+    try {
+      store = await createFirebaseStore();
+    } catch (err) {
+      console.error(err);
+      setEmpty("Geen verbinding", "");
+      let s = 15;
+      const tick = () => showStatus(`Kan de database niet bereiken. Opnieuw proberen over ${s} s.`, true);
+      tick();
+      setInterval(() => { if (--s <= 0) location.reload(); else tick(); }, 1000);
+      $("statusRetry").onclick = () => location.reload();
+      return;
+    }
+  }
+  const sub = store.subscribe(onData, onStatus);
+  $("statusRetry").onclick = () => sub.retryNow();
+  addEventListener("online", () => sub.retryNow());
+  // A wrong config or a blocked network does not raise an error; Firestore
+  // just keeps trying quietly. Say so instead of showing "Verbinden…" forever.
+  setTimeout(() => {
+    if (gotSnapshot) return;
+    setEmpty("Nog geen verbinding", "Controleer de wifi en de firebaseConfig.");
+    showStatus("Nog geen verbinding met de database. We blijven het proberen.");
+  }, 15000);
+}
+boot();
+</script>
+</body>
+</html>
